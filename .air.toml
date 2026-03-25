@@ -1,0 +1,41 @@
+# .air.toml
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # The command Air runs to build your app
+  cmd = "go build -o ./tmp/main.exe ./cmd/api/"
+  
+  # The binary Air runs after a successful build
+  entrypoint = "./tmp/main.exe"
+  
+  # Files that trigger a rebuild when changed
+  include_ext = ["go", "env"]
+  
+  # Directories to ignore
+  exclude_dir = ["tmp", "vendor", "docs", "migrations"]
+  
+  # Files to ignore
+  exclude_file = []
+  
+  # How long to wait before rebuilding after a change (ms)
+  delay = 1000
+  
+  # Kill the running binary before rebuilding
+  kill_delay = "0s"
+  
+  # Show build log
+  log = "build-errors.log"
+
+[log]
+  time = true
+
+[color]
+  main     = "magenta"
+  watcher  = "cyan"
+  build    = "yellow"
+  runner   = "green"
+
+[misc]
+  clean_on_exit = true
