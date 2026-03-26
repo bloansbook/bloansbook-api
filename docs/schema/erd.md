@@ -346,15 +346,6 @@ staff.supabase_uid ──── Supabase Auth (external system)
 
 ---
 
-## Notes
-
-- `....>` denotes a loose reference (no FK constraint)
-- `────` denotes a direct FK relationship
-- `──<` denotes a one-to-many relationship
-- `>──<` denotes a many-to-many junction
-
----
-
 ---
 
 ## GROUP 3 - MASTER DATA
@@ -1067,6 +1058,15 @@ bill_payments >── bills
 bill_payments >── suppliers (Group 3)
 bill_payments ──> cash_transactions (Group 10)
 ```
+
+---
+
+## Notes
+
+- `....>` denotes a loose reference (no FK constraint)
+- `────` denotes a direct FK relationship
+- `──<` denotes a one-to-many relationship
+- `>──<` denotes a many-to-many junction
 
 ---
 
