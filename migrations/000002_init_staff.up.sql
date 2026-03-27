@@ -14,17 +14,16 @@ CREATE TABLE IF NOT EXISTS staff (
     bank_account_name TEXT,
     department TEXT NOT NULL,
     job_title TEXT NOT NULL,
-    pay_type TEXT DEFAULT "monthly" NOT NULL,
+    pay_type TEXT DEFAULT 'monthly' NOT NULL,
     base_salary NUMERIC(15, 2) NOT NULL,
-    status TEXT NOT NULL DEFAULT "active",
+    status TEXT NOT NULL DEFAULT 'active',
     has_login boolean NOT NULL DEFAULT FALSE,
     superbase_uid TEXT UNIQUE,
     created_by TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-
-    CREATE INDEX idx_staff_login ON staff(has_login, staff_id, status)
 );
+CREATE INDEX idx_staff_login ON staff(has_login, staff_id, status);
 
 CREATE TABLE IF NOT EXISTS fired_staff (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

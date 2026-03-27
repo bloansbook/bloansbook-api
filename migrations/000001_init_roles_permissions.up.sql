@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS role_permissions (
     permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
     PRIMARY KEY (role_id, permission_id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-
-    CREATE INDEX idx_role_permissions_role_id ON role_permisions(role_id)
-    CREATE INDEX idx_role_permissions_permission_id ON role_permisions(permission_id)
 );
+CREATE INDEX idx_role_permissions_role_id ON role_permisions(role_id);
+CREATE INDEX idx_role_permissions_permission_id ON role_permisions(permission_id);
