@@ -1,0 +1,2 @@
+DROP TABLE staff IF EXISTS;
+DROP TABLE fired_staff IF EXISTS;
