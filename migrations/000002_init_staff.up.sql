@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS fired_staff (
 
     CONSTRAINT override_requires_reason
     CHECK (
-        is_overridden = false
+        is_overridden = FALSE
         OR override_reason IS NOT NULL
     )
 );
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS staff_roles (
     assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     assigned_by UUID NOT NULL REFERENCES staff(id),
 
-    PRIMARY KEY (staff_id, role_id, status)
+    PRIMARY KEY (staff_id, role_id)
 );
 
 CREATE INDEX idx_staff_roles_staff_id ON staff_roles(staff_id);
