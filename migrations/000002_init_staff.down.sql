@@ -1,2 +1,2 @@
-DROP TABLE staff IF EXISTS;
-DROP TABLE fired_staff IF EXISTS;
+DROP TABLE IF EXISTS staff;
+DROP TABLE IF EXISTS fired_staff;
