@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS staff (
     CHECK (
         status = 'fired' AND fired_at IS NOT NULL
         OR status != 'fired'
-    )
+    ),
 
     CONSTRAINT valid_status CHECK (status IN ('active', 'inactive', 'fired'))
 );
