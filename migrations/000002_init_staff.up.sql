@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS staff (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     email TEXT,
+    phone TEXT,
     address TEXT,
     date_of_birth DATE,
     date_of_hire DATE,
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS staff (
     has_login boolean NOT NULL DEFAULT FALSE,
     superbase_uid TEXT UNIQUE,
 
-    created_by TEXT NOT NULL,
+    created_by UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -89,14 +90,14 @@ CREATE TABLE IF NOT EXISTS staff_role_history (
     staff_id UUID NOT NULL REFERENCES staff(id),
     role_id UUID NOT NULL REFERENCES roles(id),
 
-    actions TEXT NOT NULL,
+    action TEXT NOT NULL,
 
     performed_by UUID NOT NULL,
     reason TEXT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT valid_actions CHECK (actions IN ('assigned', 'revoked'))
+    CONSTRAINT valid_actions CHECK (action IN ('assigned', 'revoked'))
 );
 
 CREATE INDEX idx_staff_role_history_staff_id ON staff_role_history(staff_id);
