@@ -25,8 +25,8 @@ const (
 type Staff struct {
 	models.BaseModel
 
-	StaffID  string `json:"staffId" db:"staff_id"`
-	Password string `json:"password" db:"password_hash"`
+	StaffID  string  `json:"staffId" db:"staff_id"`
+	Password *string `json:"_" db:"password_hash"`
 
 	FirstName             string     `json:"firstName" db:"first_name"`
 	LastName              string     `json:"lastName" db:"last_name"`
@@ -34,7 +34,7 @@ type Staff struct {
 	Phone                 *string    `json:"phone" db:"phone"`
 	Address               *string    `json:"address" db:"address"`
 	DateOfBirth           *time.Time `json:"dateOfBirth" db:"date_of_birth"`
-	DateOfHire            *time.Time `json:"dateOfHire" db:"date_of_hire"`
+	DateOfHire            time.Time  `json:"dateOfHire" db:"date_of_hire"`
 	EmergencyContactName  *string    `json:"emergencyContactName" db:"emergency_contact_name"`
 	EmergencyContactPhone *string    `json:"emergencyContactPhone" db:"emergency_contact_phone"`
 
