@@ -28,3 +28,10 @@ type BaseModelWithoutUpdatedAt struct {
 	BaseWithId
 	BaseWithCreatedAt
 }
+
+type BaseStatus string
+
+const (
+	StatusActive   BaseStatus = "active"
+	StatusInactive BaseStatus = "inactive"
+)
