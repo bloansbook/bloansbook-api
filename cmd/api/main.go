@@ -27,12 +27,19 @@ func main() {
 		AppName: "BloansBook API v1",
 	})
 
+	// Use a config-driven CORS setup for production readiness
+	allowedOrigins := config.ApplicationConfig.App.AllowedOrigins
+	if allowedOrigins == "" {
+		allowedOrigins = "*" // Fallback to * for local dev if not specified
+	}
+
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowOrigins:     []string{allowedOrigins},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowCredentials: true,
 	}))
 
 	app.Get("/health", func(c fiber.Ctx) error {
@@ -44,9 +51,9 @@ func main() {
 
 	api := app.Group("/api/v1")
 	_ = api
+	// SetupRoutes(api) // TODO: create a separate function/package to attach your routes
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	serverErrors := make(chan error, 1)
 
 	go func() {
 		port := config.ApplicationConfig.App.Port
@@ -54,13 +61,21 @@ func main() {
 			port = "8080"
 		}
 		log.Printf("BloansBooks API running on port %s", port)
-		if err := app.Listen(":" + port); err != nil {
-			log.Fatalf("Server error: %v", err)
-		}
+		serverErrors <- app.Listen(":" + port)
 	}()
 
-	<-quit
-	log.Println("Shutting down server...")
-	_ = app.Shutdown()
-	log.Println("Server stopped")
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErrors:
+		log.Printf("Error starting server: %v", err)
+	case sig := <-quit:
+		log.Printf("Received signal: %v. Shutting down server...", sig)
+		if err := app.Shutdown(); err != nil {
+			log.Printf("Error during server shutdown: %v", err)
+		}
+	}
+
+	log.Println("Server gracefully stopped")
 }
