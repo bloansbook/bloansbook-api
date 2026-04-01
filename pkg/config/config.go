@@ -16,8 +16,9 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Env  string
-	Port string
+	Env            string
+	Port           string
+	AllowedOrigins string
 }
 
 type DatabaseConfig struct {
@@ -52,8 +53,9 @@ func Load() {
 
 	ApplicationConfig = &Config{
 		App: AppConfig{
-			Env:  viper.GetString("APP_ENV"),
-			Port: viper.GetString("APP_PORT"),
+			Env:            viper.GetString("APP_ENV"),
+			Port:           viper.GetString("APP_PORT"),
+			AllowedOrigins: viper.GetString("ALLOWED_ORIGINS"),
 		},
 		Database: DatabaseConfig{
 			URL: viper.GetString("DATABASE_URL"),
