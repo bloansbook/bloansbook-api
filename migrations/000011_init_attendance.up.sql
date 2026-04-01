@@ -31,14 +31,12 @@ CREATE TABLE IF NOT EXISTS attendance_daily (
 
     CONSTRAINT unique_staff_date UNIQUE (staff_id, date),
 
-    -- If resolved, must have resolver
     CONSTRAINT exception_resolution_check
         CHECK (
             exception_resolved = false
             OR (exception_resolved_by IS NOT NULL AND exception_resolved_at IS NOT NULL)
         ),
 
-    -- Manual edit must have reason
     CONSTRAINT manual_edit_reason_check
         CHECK (
             is_manual_edit = false
@@ -73,7 +71,7 @@ CREATE TABLE IF NOT EXISTS overtime_requests (
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT unique_staff_date UNIQUE (staff_id, date),
+    CONSTRAINT unique_date_staff UNIQUE (staff_id, date),
 
     CONSTRAINT overtime_status_check
         CHECK (status IN ('pending', 'approved', 'partial', 'rejected')),
