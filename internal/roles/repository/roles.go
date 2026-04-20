@@ -23,26 +23,17 @@ func NewRolesRepository(db *pgxpool.Pool, config *config.Config) *RolesRepositor
 	}
 }
 
-func (r *RolesRepository) validateRoleExists(ctx context.Context, roleID uuid.UUID) error {
+func (r *RolesRepository) ValidateRoleExists(ctx context.Context, roleID uuid.UUID) error {
 	stmt := `SELECT EXISTS(SELECT 1 FROM roles WHERE id = @role_id)`
 
-	rows, err := r.db.Query(ctx, stmt, pgx.NamedArgs{
-		"role_id": roleID,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to check role existence: %w", err)
-	}
-
 	var exists bool
-	_, err = pgx.ForEachRow(rows, func(row pgx.CollectableRow) error {
-		return row.Scan(&exists)
-	})
+	err := r.db.QueryRow(ctx, stmt, pgx.NamedArgs{"role_id": roleID}).Scan(&exists)
 	if err != nil {
-		return fmt.Errorf("failed to scan existence result: %w", err)
+		return fmt.Errorf("failed to check if role exists: %w", err)
 	}
 
 	if !exists {
-		return fmt.Errorf("role with ID %s does not exist", roleID.String())
+		return fmt.Errorf("role with ID %s does not exist", roleID)
 	}
 
 	return nil
