@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 
+	"github.com/bloansbook/bloansbook-api/internal/api"
 	"github.com/bloansbook/bloansbook-api/pkg/config"
 	"github.com/bloansbook/bloansbook-api/pkg/database"
 )
@@ -39,7 +40,7 @@ func main() {
 		AllowOrigins:     []string{allowedOrigins},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 	}))
 
 	app.Get("/health", func(c fiber.Ctx) error {
@@ -49,9 +50,7 @@ func main() {
 		})
 	})
 
-	api := app.Group("/api/v1")
-	_ = api
-	// SetupRoutes(api) // TODO: create a separate function/package to attach your routes
+	api.SetupRoutes(app)
 
 	serverErrors := make(chan error, 1)
 
