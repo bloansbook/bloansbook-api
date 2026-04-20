@@ -51,15 +51,18 @@ const (
 
 // Roles & Permissions
 const (
-	RoleCreated            = "Role created successfully"
-	RoleFetched            = "Role fetched successfully"
-	RoleListFetched        = "Roles fetched successfully"
-	RoleUpdated            = "Role updated successfully"
-	RoleNotFound           = "Role not found"
-	RoleAssigned           = "Role assigned successfully"
-	RoleRevoked            = "Role revoked successfully"
-	PermissionNotFound     = "Permission not found"
-	CannotModifySuperAdmin = "The Super Admin role cannot be modified"
+	RoleCreated              = "Role created successfully"
+	RoleFetched              = "Role fetched successfully"
+	RoleListFetched          = "Roles fetched successfully"
+	RoleUpdated              = "Role updated successfully"
+	RoleNotFound             = "Role not found"
+	RoleAssigned             = "Role assigned successfully"
+	RoleRevoked              = "Role revoked successfully"
+	PermissionAssignedToRole = "Permission assigned to role successfully"
+	PermissionNotFound       = "Permission not found"
+	PermissionCreated        = "Permission created successfully"
+	PermissionFetched        = "Permission fetched successfully"
+	CannotModifySuperAdmin   = "The Super Admin role cannot be modified"
 )
 
 // Customers
