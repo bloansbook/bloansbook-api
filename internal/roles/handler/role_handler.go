@@ -4,6 +4,7 @@ import (
 	"github.com/bloansbook/bloansbook-api/internal/models/roles"
 	"github.com/bloansbook/bloansbook-api/internal/roles/usecase"
 	"github.com/bloansbook/bloansbook-api/pkg/response"
+	"github.com/bloansbook/bloansbook-api/pkg/sysmsg"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -22,7 +23,7 @@ func (r *RolesHandler) CreateRole(c fiber.Ctx) error {
 	// Parse request body
 	var payload roles.CreateRolePayload
 	if err := c.Bind().Body(&payload); err != nil {
-		return response.Error(c, "Invalid request body", fiber.StatusBadRequest)
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
 	}
 
 	// Create role with usecase
@@ -32,14 +33,14 @@ func (r *RolesHandler) CreateRole(c fiber.Ctx) error {
 	}
 
 	// Return response
-	return response.Success(c, "Role created successfully", role, fiber.StatusCreated)
+	return response.Success(c, sysmsg.RoleCreated, role, fiber.StatusCreated)
 }
 
 func (r *RolesHandler) CreatePermission(c fiber.Ctx) error {
 	// Parse request body
 	var payload roles.CreatePermissionPayload
 	if err := c.Bind().Body(&payload); err != nil {
-		return response.Error(c, "Invalid request body", fiber.StatusBadRequest)
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
 	}
 
 	// Create Permission with usecase
@@ -49,14 +50,14 @@ func (r *RolesHandler) CreatePermission(c fiber.Ctx) error {
 	}
 
 	// Return response
-	return response.Success(c, "Permission created successfully", permission, fiber.StatusCreated)
+	return response.Success(c, sysmsg.PermissionCreated, permission, fiber.StatusCreated)
 }
 
 func (r *RolesHandler) AssignPermissionToRole(c fiber.Ctx) error {
 	// Parse request body
 	var payload roles.CreateRolePermissionPayload
 	if err := c.Bind().Body(&payload); err != nil {
-		return response.Error(c, "Invalid request body", fiber.StatusBadRequest)
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
 	}
 
 	// Assign permission to role with usecase
@@ -66,7 +67,7 @@ func (r *RolesHandler) AssignPermissionToRole(c fiber.Ctx) error {
 	}
 
 	// Return response
-	return response.Success(c, "Permission assigned to role successfully", rolePermission, fiber.StatusCreated)
+	return response.Success(c, sysmsg.PermissionAssignedToRole, rolePermission, fiber.StatusCreated)
 }
 
 func (r *RolesHandler) GetAllRoles(c fiber.Ctx) error {
@@ -78,18 +79,18 @@ func (r *RolesHandler) GetAllRoles(c fiber.Ctx) error {
 		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
 	}
 
-	return response.Success(c, "Roles fetched successfully", roles, fiber.StatusOK)
+	return response.Success(c, sysmsg.RoleListFetched, roles, fiber.StatusOK)
 }
 
 func (r *RolesHandler) GetRoleWithPermissions(c fiber.Ctx) error {
 	roleID := c.Params("id")
 	if roleID == "" {
-		return response.Error(c, "RoleID is required", fiber.StatusBadRequest)
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
 	}
 
 	id, err := uuid.Parse(roleID)
 	if err != nil {
-		return response.Error(c, "Invalid RoleID format", fiber.StatusBadRequest)
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
 	}
 
 	role, err := r.usecase.GetRoleWithPermissions(c.Context(), id)
@@ -97,5 +98,5 @@ func (r *RolesHandler) GetRoleWithPermissions(c fiber.Ctx) error {
 		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
 	}
 
-	return response.Success(c, "Role fetched successfully", role, fiber.StatusOK)
+	return response.Success(c, sysmsg.RoleFetched, role, fiber.StatusOK)
 }
