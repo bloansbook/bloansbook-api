@@ -62,12 +62,9 @@ func (u *RolesUsecase) CreatePermission(ctx context.Context, payload *roles.Crea
 
 // AssignPermissionToRole links a permission to a role
 func (u *RolesUsecase) AssignPermissionToRole(ctx context.Context, payload *roles.CreateRolePermissionPayload) (*roles.CreateRolePermissionResponse, error) {
-	exists, err := u.validateRoleExists(ctx, payload.RoleID)
+	err := u.repository.ValidateRoleExists(ctx, payload.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate role: %w", err)
-	}
-	if !exists {
-		return nil, fmt.Errorf("role with ID %s does not exist", payload.RoleID.String())
 	}
 
 	rolePermission, err := u.repository.CreateRolePermission(ctx, payload)
@@ -92,7 +89,7 @@ func (u *RolesUsecase) AssignPermissionToRole(ctx context.Context, payload *role
 // GetAllRoles returns all roles with their permissions
 func (u *RolesUsecase) GetAllRoles(ctx context.Context, limit, offset int) ([]roles.RoleWithPermissions, error) {
 	if limit <= 0 {
-		limit = 20
+		limit = 10
 	}
 	if offset < 0 {
 		offset = 0
@@ -114,13 +111,4 @@ func (u *RolesUsecase) GetRoleWithPermissions(ctx context.Context, roleID uuid.U
 	}
 
 	return roleWithPermissions, nil
-}
-
-// validateRoleExists checks if a role exists (moved from repository to usecase)
-func (u *RolesUsecase) validateRoleExists(ctx context.Context, roleID uuid.UUID) (bool, error) {
-	_, err := u.repository.GetRoleWithPermissions(ctx, roleID)
-	if err != nil {
-		return false, nil // Role doesn't exist
-	}
-	return true, nil
 }
