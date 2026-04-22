@@ -3,7 +3,6 @@ package staff
 import (
 	"time"
 
-	"github.com/bloansbook/bloansbook-api/internal/models/roles"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
@@ -44,18 +43,17 @@ type StaffDTO struct {
 }
 
 type StaffSummary struct {
-	StaffID   string      `json:"staffId"`
-	FirstName string      `json:"firstName"`
-	LastName  string      `json:"lastName"`
-	Email     *string     `json:"email,omitempty"`
-	Phone     *string     `json:"phone,omitempty"`
-	Status    StaffStatus `json:"status"`
+	StaffID    string      `json:"staffId"`
+	FirstName  string      `json:"firstName"`
+	LastName   string      `json:"lastName"`
+	Email      *string     `json:"email,omitempty"`
+	Phone      *string     `json:"phone,omitempty"`
+	Department string      `json:"department"`
+	JobTitle   string      `json:"jobTitle"`
+	Status     StaffStatus `json:"status"`
 }
 
 type CreateStaffPayload struct {
-	StaffID  string `json:"staffId" validate:"required"`
-	Password string `json:"password" validate:"required"`
-
 	FirstName   string     `json:"firstName" validate:"required"`
 	LastName    string     `json:"lastName" validate:"required"`
 	Email       *string    `json:"email"`
@@ -81,15 +79,40 @@ type CreateStaffPayload struct {
 	Status StaffStatus `json:"status" validate:"required,oneof=active inactive fired"`
 }
 
+type Credentials struct {
+	StaffID  string `json:"staffId" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
 type CreateStaffResponse struct {
 	ID    uuid.UUID    `json:"id"`
-	Staff StaffSummary `json:"staff"`
-
-	CreatedBy StaffSummary `json:"createdBy"`
-
-	Roles       []roles.RoleSummary       `json:"roles"`
-	Permissions []roles.PermissionSummary `json:"permissions"`
+	Staff StaffSummary `json:"staff_info"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type UpdateStaffPayload struct {
+	FirstName             *string          `json:"firstName,omitempty"`
+	LastName              *string          `json:"lastName,omitempty"`
+	Email                 *string          `json:"email,omitempty"`
+	Phone                 *string          `json:"phone,omitempty"`
+	Address               *string          `json:"address,omitempty"`
+	DateOfBirth           *time.Time       `json:"dateOfBirth,omitempty"`
+	EmergencyContactName  *string          `json:"emergencyContactName,omitempty"`
+	EmergencyContactPhone *string          `json:"emergencyContactPhone,omitempty"`
+	BankName              *string          `json:"bankName,omitempty"`
+	BankAccountNumber     *string          `json:"bankAccountNumber,omitempty"`
+	BankAccountName       *string          `json:"bankAccountName,omitempty"`
+	Department            *string          `json:"department,omitempty"`
+	JobTitle              *string          `json:"jobTitle,omitempty"`
+	PayType               *string          `json:"payType,omitempty"`
+	BaseSalary            *decimal.Decimal `json:"baseSalary,omitempty"`
+	Status                *StaffStatus     `json:"status,omitempty"`
+}
+
+type UpdateStaffResponse struct {
+	ID        uuid.UUID    `json:"id"`
+	Staff     StaffSummary `json:"staff"`
+	UpdatedAt time.Time    `json:"updatedAt"`
 }
