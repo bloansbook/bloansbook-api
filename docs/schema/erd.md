@@ -28,7 +28,7 @@ Each group covers a set of related tables. For every table you will find:
 
 ## GROUP 1 — Auth & Security
 
-**Tables:** `roles`, `permissions`, `role_permissions`, `fired_staff`
+**Tables:** `roles`, `permissions`, `role_permissions`
 
 These tables form the access control foundation. They define what roles
 exist, what each role can do, and which staff members are permanently
@@ -144,35 +144,6 @@ roles (1) ──< role_permissions >── (many) permissions
 
 ---
 
-### Table: `fired_staff`
-
-**Purpose:**
-Permanent termination records. The Go backend checks this table on
-every login attempt before validating the password. If the Staff ID
-is found here and `is_overridden = false`, login is refused
-immediately regardless of password correctness.
-
-Records in this table are never deleted. An incorrect termination
-is corrected by setting `is_overridden = true` with a mandatory reason.
-
-| Column               | Type        | Constraints                            | Notes                                                                                                                                                                            |
-| -------------------- | ----------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                 | UUID        | PRIMARY KEY, DEFAULT gen_random_uuid() | Internal identifier                                                                                                                                                              |
-| `staff_id`           | TEXT        | NOT NULL                               | The terminated staff member's business ID e.g. `BLN-0042`. Loose reference to `staff.staff_id` — deliberately no FK so the block persists even if staff records are restructured |
-| `termination_date`   | DATE        | NOT NULL                               | Date the staff member was terminated                                                                                                                                             |
-| `termination_reason` | TEXT        | NOT NULL                               | Mandatory termination reason e.g. Resigned, Dismissed, Contract Ended, Redundancy                                                                                                |
-| `recorded_by`        | TEXT        | NOT NULL                               | Staff ID of the HR Manager or Super Admin who recorded the termination                                                                                                           |
-| `recorded_at`        | TIMESTAMPTZ | NOT NULL, DEFAULT now()                | Set by Go backend, UTC                                                                                                                                                           |
-| `is_overridden`      | BOOLEAN     | NOT NULL, DEFAULT false                | Set to true if the termination was recorded in error and a Super Admin has overridden it                                                                                         |
-| `overridden_by`      | TEXT        | NULL                                   | Staff ID of the Super Admin who overrode the termination. NULL until overridden                                                                                                  |
-| `overridden_at`      | TIMESTAMPTZ | NULL                                   | Timestamp of the override. Set by Go, UTC. NULL until overridden                                                                                                                 |
-| `override_reason`    | TEXT        | NULL                                   | Mandatory when `is_overridden` is set to true. Must be provided by the Super Admin                                                                                               |
-
-**Indexes:**
-
-- `PRIMARY KEY` on `id`
-- Index on `staff_id` — this column is queried on every login attempt, must be fast
-
 **Business rules:**
 
 - Login check: `SELECT * FROM fired_staff WHERE staff_id = $1 AND is_overridden = false`
@@ -250,7 +221,7 @@ audit logs.
 
 ---
 
-### Table: `user_roles`
+### Table: `staff_roles`
 
 **Purpose:**
 Stores the current active role for each login-enabled staff member.
@@ -260,13 +231,12 @@ updating, Go writes the previous role to `role_history`.
 Only exists for `has_login = true` staff. No-login staff have no
 system role and no entry in this table.
 
-| Column        | Type        | Constraints                             | Notes                                                            |
-| ------------- | ----------- | --------------------------------------- | ---------------------------------------------------------------- |
-| `id`          | UUID        | PRIMARY KEY, DEFAULT gen_random_uuid()  | Internal identifier                                              |
-| `staff_id`    | TEXT        | NOT NULL, UNIQUE, FK → `staff.staff_id` | UNIQUE enforces one active role per staff member at the DB level |
-| `role_id`     | UUID        | NOT NULL, FK → `roles.id`               | The currently active role                                        |
-| `assigned_by` | TEXT        | NOT NULL                                | Staff ID of the HR Manager or Super Admin who assigned this role |
-| `assigned_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now()                 | Set by Go, UTC                                                   |
+| Column        | Type        | Constraints                       | Notes                                                            |
+| ------------- | ----------- | --------------------------------- | ---------------------------------------------------------------- |
+| `staff_id`    | UUID        | NOT NULL, UNIQUE, FK → `staff.id` | UNIQUE enforces one active role per staff member at the DB level |
+| `role_id`     | UUID        | NOT NULL, FK → `roles.id`         | The currently active role                                        |
+| `assigned_by` | TEXT        | NOT NULL                          | Staff ID of the HR Manager or Super Admin who assigned this role |
+| `assigned_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now()           | Set by Go, UTC                                                   |
 
 **Indexes:**
 
@@ -289,6 +259,35 @@ staff (1) ──── user_roles (1) ──── roles (1)
 - HR Manager can assign any role except `super_admin`
 - Only Super Admin can assign the `super_admin` role (ownership transfer)
 - The `super_admin` role can only be held by one active staff member at a time
+
+---
+
+### Table: `fired_staff`
+
+**Purpose:**
+Permanent termination records. This is for historical purpose. No deletion, just change in status.
+Every record here can not login into the system.
+
+Records in this table are never deleted. An incorrect termination
+is corrected by setting `is_overridden = true` with a mandatory reason.
+
+| Column               | Type        | Constraints                            | Notes                                                                                                                                                                            |
+| -------------------- | ----------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                 | UUID        | PRIMARY KEY, DEFAULT gen_random_uuid() | Internal identifier                                                                                                                                                              |
+| `staff_id`           | TEXT        | NOT NULL                               | The terminated staff member's business ID e.g. `BLN-0042`. Loose reference to `staff.staff_id` — deliberately no FK so the block persists even if staff records are restructured |
+| `termination_date`   | DATE        | NOT NULL                               | Date the staff member was terminated                                                                                                                                             |
+| `termination_reason` | TEXT        | NOT NULL                               | Mandatory termination reason e.g. Resigned, Dismissed, Contract Ended, Redundancy                                                                                                |
+| `recorded_by`        | TEXT        | NOT NULL                               | Staff ID of the HR Manager or Super Admin who recorded the termination                                                                                                           |
+| `recorded_at`        | TIMESTAMPTZ | NOT NULL, DEFAULT now()                | Set by Go backend, UTC                                                                                                                                                           |
+| `is_overridden`      | BOOLEAN     | NOT NULL, DEFAULT false                | Set to true if the termination was recorded in error and a Super Admin has overridden it                                                                                         |
+| `overridden_by`      | TEXT        | NULL                                   | Staff ID of the Super Admin who overrode the termination. NULL until overridden                                                                                                  |
+| `overridden_at`      | TIMESTAMPTZ | NULL                                   | Timestamp of the override. Set by Go, UTC. NULL until overridden                                                                                                                 |
+| `override_reason`    | TEXT        | NULL                                   | Mandatory when `is_overridden` is set to true. Must be provided by the Super Admin                                                                                               |
+
+**Indexes:**
+
+- `PRIMARY KEY` on `id`
+- Index on `staff_id` — this column is queried on every login attempt, must be fast
 
 ---
 
@@ -386,7 +385,7 @@ by Admin or Super Admin — Sales Manager can create but not edit.
 | `type`        | TEXT        | NOT NULL                               | One of: `retail`, `corporate`                 |
 | `currency`    | TEXT        | NOT NULL, DEFAULT 'NGN'                | Billing currency. NGN only for v1             |
 | `notes`       | TEXT        | NULL                                   | Free-text account notes                       |
-| `created_by`  | TEXT        | NOT NULL                               | Staff ID of creator                           |
+| `created_by`  | UUID        | NOT NULL                               | Staff ID of creator                           |
 | `created_at`  | TIMESTAMPTZ | NOT NULL, DEFAULT now()                | Set by Go, UTC                                |
 | `updated_at`  | TIMESTAMPTZ | NOT NULL, DEFAULT now()                | Set by Go on every update, UTC                |
 
