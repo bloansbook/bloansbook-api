@@ -2,9 +2,11 @@ package idgen
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -15,12 +17,15 @@ func GenerateSequentialID(ctx context.Context, db *pgxpool.Pool, table, column, 
 
 	err := db.QueryRow(ctx, query).Scan(&lastID)
 	if err != nil {
-		return fmt.Sprintf("%s-%4d", prefix, 1), nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Sprintf("%s-%04d", prefix, 1), nil
+		}
+		return "", err
 	}
 
 	var num int
-	fmt.Sscanf(lastID, prefix+"-%4d", &num)
-	return fmt.Sprintf("%s-%4d", prefix, num+1), nil
+	fmt.Sscanf(lastID, prefix+"-%04d", &num)
+	return fmt.Sprintf("%s-%04d", prefix, num+1), nil
 }
 
 func GenerateDailyID(ctx context.Context, db *pgxpool.Pool, table, column, prefix string) (string, error) {
