@@ -53,7 +53,28 @@ type Staff struct {
 	HasLogin     bool    `json:"hasLogin" db:"has_login"`
 	SuperbaseUID *string `json:"superbaseUID" db:"superbase_uid"`
 
-	CreatedBy uuid.UUID `json:"createdBy" db:"created_by"`
+	CreatorID         uuid.UUID   `db:"creator_id"`
+	CreatorStaffID    string      `db:"creator_staff_id"`
+	CreatorFirstName  string      `db:"creator_first_name"`
+	CreatorLastName   string      `db:"creator_last_name"`
+	CreatorEmail      *string     `db:"creator_email"`
+	CreatorPhone      *string     `db:"creator_phone"`
+	CreatorDepartment string      `db:"creator_department"`
+	CreatorJobTitle   string      `db:"creator_job_title"`
+	CreatorStatus     StaffStatus `db:"creator_status"`
+}
+
+type StaffCreate struct {
+	models.BaseModel
+
+	StaffID    string      `json:"staffId" db:"staff_id"`
+	FirstName  string      `json:"firstName" db:"first_name"`
+	LastName   string      `json:"lastName" db:"last_name"`
+	Email      *string     `json:"email" db:"email"`
+	Phone      *string     `json:"phone" db:"phone"`
+	Department string      `json:"department" db:"department"`
+	JobTitle   string      `json:"jobTitle" db:"job_title"`
+	Status     StaffStatus `json:"status" db:"status"`
 }
 
 type FiredStaff struct {
