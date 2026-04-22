@@ -23,42 +23,53 @@ func NewStaffRepository(db *pgxpool.Pool, config *config.Config) *StaffRepositor
 	}
 }
 
-func (s *StaffRepository) CreateStaff(ctx context.Context, createdBy uuid.UUID, payload *staff.CreateStaffPayload) (*staff.Staff, error) {
+func (s *StaffRepository) CountStaff(ctx context.Context) (int, error) {
+	stmt := `SELECT COUNT(*) FROM staff`
+
+	var count int
+	err := s.db.QueryRow(ctx, stmt).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count staff: %w", err)
+	}
+
+	return count, nil
+}
+
+func (s *StaffRepository) CreateStaff(ctx context.Context, createdBy uuid.UUID, payload *staff.CreateStaffPayload, credentials staff.Credentials) (*staff.StaffCreate, error) {
 	stmt := `
-	INSERT INTO staff (
-		staff_id, password_hash, first_name, last_name, email, phone, address, date_of_birth, date_of_hire, emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number, bank_account_name, department, job_title, pay_type, base_salary, status, created_by, has_login
-	) VALUES (
-	 	@staff_id, @password_hash, @first_name, @last_name, @email, @phone, @address, @date_of_birth, @date_of_hire, @emergency_contact_name, @emergency_contact_phone,
-		@bank_name, @bank_account_number, @bank_account_name, @department, @job_title, @pay_type, @base_salary, @status, @created_by, @has_login
-	) RETURNING id, staff_id, first_name, last_name, email, phone, address, date_of_birth, date_of_hire, emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number, bank_account_name, department, job_title, pay_type, base_salary, status, fired_at, has_login, superbase_uid, created_by, created_at, updated_at
+		INSERT INTO staff (
+			staff_id, password_hash, first_name, last_name, email, phone, address, date_of_birth, date_of_hire, emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number, bank_account_name, department, job_title, pay_type, base_salary, status, created_by, has_login
+		) VALUES (
+			@staff_id, @password_hash, @first_name, @last_name, @email, @phone, @address, @date_of_birth, @date_of_hire, @emergency_contact_name, @emergency_contact_phone, @bank_name, @bank_account_number, @bank_account_name, @department, @job_title, @pay_type, @base_salary, @status, @created_by, @has_login
+		) RETURNING id, staff_id, first_name, last_name, email, phone, department, job_title, created_at, updated_at, status
 	`
 
 	var exists bool
 	checkStmt := `SELECT EXISTS(SELECT 1 FROM staff WHERE staff_id = @staff_id)`
-	err := s.db.QueryRow(ctx, checkStmt, pgx.NamedArgs{"staff_id": payload.StaffID}).Scan(&exists)
+	err := s.db.QueryRow(ctx, checkStmt, pgx.NamedArgs{"staff_id": credentials.StaffID}).Scan(&exists)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if staff exists: %w", err)
 	}
 
 	if exists {
-		return nil, fmt.Errorf("staff_id %s already exists", payload.StaffID)
+		return nil, fmt.Errorf("staff_id %s already exists", credentials.StaffID)
 	}
 
 	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
-		"staff_id":                payload.StaffID,
-		"password_hash":           payload.Password,
+		"staff_id":                credentials.StaffID,
+		"password_hash":           credentials.Password,
 		"first_name":              payload.FirstName,
 		"last_name":               payload.LastName,
-		"email":                   payload.Email,
-		"phone":                   payload.Phone,
-		"address":                 payload.Address,
-		"date_of_birth":           payload.DateOfBirth,
+		"email":                   &payload.Email,
+		"phone":                   &payload.Phone,
+		"address":                 &payload.Address,
+		"date_of_birth":           &payload.DateOfBirth,
 		"date_of_hire":            payload.DateOfHire,
-		"emergency_contact_name":  payload.EmergencyContactName,
-		"emergency_contact_phone": payload.EmergencyContactPhone,
-		"bank_name":               payload.BankName,
-		"bank_account_number":     payload.BankAccountNumber,
-		"bank_account_name":       payload.BankAccountName,
+		"emergency_contact_name":  &payload.EmergencyContactName,
+		"emergency_contact_phone": &payload.EmergencyContactPhone,
+		"bank_name":               &payload.BankName,
+		"bank_account_number":     &payload.BankAccountNumber,
+		"bank_account_name":       &payload.BankAccountName,
 		"department":              payload.Department,
 		"job_title":               payload.JobTitle,
 		"pay_type":                payload.PayType,
@@ -72,10 +83,206 @@ func (s *StaffRepository) CreateStaff(ctx context.Context, createdBy uuid.UUID, 
 		return nil, fmt.Errorf("failed to execute query for creating staff: %w", err)
 	}
 
-	staff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.Staff])
+	staff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.StaffCreate])
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect created staff: %w", err)
 	}
 
 	return &staff, nil
+}
+
+func (s *StaffRepository) CreateStaffWithFixedID(ctx context.Context, id, createdBy uuid.UUID, payload *staff.CreateStaffPayload, credentials staff.Credentials) (*staff.StaffCreate, error) {
+	stmt := `
+		INSERT INTO staff (
+			id, staff_id, password_hash, first_name, last_name, email, phone, address, date_of_birth, date_of_hire, emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number, bank_account_name, department, job_title, pay_type, base_salary, status, created_by, has_login
+		) VALUES (
+			@id, @staff_id, @password_hash, @first_name, @last_name, @email, @phone, @address, @date_of_birth, @date_of_hire, @emergency_contact_name, @emergency_contact_phone, @bank_name, @bank_account_number, @bank_account_name, @department, @job_title, @pay_type, @base_salary, @status, @created_by, @has_login
+		) RETURNING id, staff_id, first_name, last_name, email, phone, department, job_title, created_at, updated_at, status
+	`
+
+	var exists bool
+	checkStmt := `SELECT EXISTS(SELECT 1 FROM staff WHERE staff_id = @staff_id)`
+	err := s.db.QueryRow(ctx, checkStmt, pgx.NamedArgs{"staff_id": credentials.StaffID}).Scan(&exists)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if staff exists: %w", err)
+	}
+
+	if exists {
+		return nil, fmt.Errorf("staff_id %s already exists", credentials.StaffID)
+	}
+
+	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
+		"id":                      id,
+		"staff_id":                credentials.StaffID,
+		"password_hash":           credentials.Password,
+		"first_name":              payload.FirstName,
+		"last_name":               payload.LastName,
+		"email":                   &payload.Email,
+		"phone":                   &payload.Phone,
+		"address":                 &payload.Address,
+		"date_of_birth":           &payload.DateOfBirth,
+		"date_of_hire":            payload.DateOfHire,
+		"emergency_contact_name":  &payload.EmergencyContactName,
+		"emergency_contact_phone": &payload.EmergencyContactPhone,
+		"bank_name":               &payload.BankName,
+		"bank_account_number":     &payload.BankAccountNumber,
+		"bank_account_name":       &payload.BankAccountName,
+		"department":              payload.Department,
+		"job_title":               payload.JobTitle,
+		"pay_type":                payload.PayType,
+		"base_salary":             payload.BaseSalary,
+		"status":                  payload.Status,
+		"created_by":              createdBy,
+		"has_login":               payload.HasLogin,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query for creating staff: %w", err)
+	}
+
+	staff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.StaffCreate])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect created staff: %w", err)
+	}
+
+	return &staff, nil
+}
+
+// GetStaffByID retrieves a staff member by ID
+func (s *StaffRepository) GetStaffByID(ctx context.Context, id uuid.UUID) (*staff.Staff, error) {
+	stmt := `
+		SELECT
+			s.id, s.staff_id, s.password_hash, s.first_name, s.last_name, s.email, s.phone, s.address, s.date_of_birth, s.date_of_hire,
+			s.emergency_contact_name, s.emergency_contact_phone, s.bank_name, s.bank_account_number,
+			s.bank_account_name, s.department, s.job_title, s.pay_type, s.base_salary, s.status, s.fired_at, s.has_login,
+			s.superbase_uid, s.created_at, s.updated_at, creator.id AS creator_id, creator.staff_id AS creator_staff_id, creator.first_name AS creator_first_name, creator.last_name AS creator_last_name, creator.email AS creator_email, creator.phone AS creator_phone, creator.department AS creator_department, creator.job_title AS creator_job_title, creator.status AS creator_status
+		FROM staff s
+		LEFT JOIN staff creator ON s.created_by = creator.id
+		WHERE s.id = @id
+	`
+
+	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
+		"id": id,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query for getting staff by ID: %w", err)
+	}
+
+	staff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.Staff])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect staff by ID: %w", err)
+	}
+
+	return &staff, nil
+}
+
+func (s *StaffRepository) GetStaffByStaffID(ctx context.Context, staffID string) (*staff.StaffCreate, error) {
+	stmt := `
+		SELECT id, staff_id, first_name, last_name, email, phone, department, job_title, created_at, updated_at
+		FROM staff
+		WHERE staff_id = @staff_id
+	`
+
+	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
+		"staff_id": staffID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query for getting staff by staff_id: %w", err)
+	}
+
+	staff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.StaffCreate])
+	if err != nil {
+		return nil, fmt.Errorf("failed to find staff by staff_id, not found: %w", err)
+	}
+
+	return &staff, nil
+}
+
+// GetAllStaff retrieves all staff members with pagination
+func (s *StaffRepository) GetAllStaff(ctx context.Context, limit, offset int) ([]staff.Staff, error) {
+	stmt := `
+		SELECT id, staff_id, first_name, last_name, email, phone, address, date_of_birth, date_of_hire,
+		       emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number,
+		       bank_account_name, department, job_title, pay_type, base_salary, status, fired_at,
+		       has_login, superbase_uid, created_by, created_at, updated_at
+		FROM staff
+		ORDER BY created_at DESC
+		LIMIT @limit OFFSET @offset
+	`
+
+	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
+		"limit":  limit,
+		"offset": offset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all staff: %w", err)
+	}
+	defer rows.Close()
+
+	staffList, err := pgx.CollectRows(rows, pgx.RowToStructByName[staff.Staff])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect staff: %w", err)
+	}
+
+	return staffList, nil
+}
+
+// UpdateStaff updates staff member information
+func (s *StaffRepository) UpdateStaff(ctx context.Context, id uuid.UUID, payload *staff.UpdateStaffPayload) (*staff.Staff, error) {
+	stmt := `
+		UPDATE staff
+		SET
+		    first_name = @first_name,
+		    last_name = @last_name,
+		    email = @email,
+		    phone = @phone,
+		    address = @address,
+		    date_of_birth = @date_of_birth,
+		    emergency_contact_name = @emergency_contact_name,
+		    emergency_contact_phone = @emergency_contact_phone,
+		    bank_name = @bank_name,
+		    bank_account_number = @bank_account_number,
+		    bank_account_name = @bank_account_name,
+		    department = @department,
+		    job_title = @job_title,
+		    pay_type = @pay_type,
+		    base_salary = @base_salary,
+		    status = @status,
+		    updated_at = NOW()
+		WHERE id = @id
+		RETURNING id, staff_id, first_name, last_name, email, phone, address, date_of_birth, date_of_hire,
+		         emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number,
+		         bank_account_name, department, job_title, pay_type, base_salary, status, fired_at,
+		         has_login, superbase_uid, created_by, created_at, updated_at
+	`
+
+	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
+		"id":                      id,
+		"first_name":              payload.FirstName,
+		"last_name":               payload.LastName,
+		"email":                   payload.Email,
+		"phone":                   payload.Phone,
+		"address":                 payload.Address,
+		"date_of_birth":           payload.DateOfBirth,
+		"emergency_contact_name":  payload.EmergencyContactName,
+		"emergency_contact_phone": payload.EmergencyContactPhone,
+		"bank_name":               payload.BankName,
+		"bank_account_number":     payload.BankAccountNumber,
+		"bank_account_name":       payload.BankAccountName,
+		"department":              payload.Department,
+		"job_title":               payload.JobTitle,
+		"pay_type":                payload.PayType,
+		"base_salary":             payload.BaseSalary,
+		"status":                  payload.Status,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update staff: %w", err)
+	}
+
+	updatedStaff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.Staff])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect updated staff: %w", err)
+	}
+
+	return &updatedStaff, nil
 }
