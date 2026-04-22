@@ -6,6 +6,11 @@ import (
 	rolesRouter "github.com/bloansbook/bloansbook-api/internal/roles/router"
 	rolesUsecase "github.com/bloansbook/bloansbook-api/internal/roles/usecase"
 
+	staffHandler "github.com/bloansbook/bloansbook-api/internal/staff/handler"
+	staffRepo "github.com/bloansbook/bloansbook-api/internal/staff/repository"
+	staffRouter "github.com/bloansbook/bloansbook-api/internal/staff/router"
+	staffUsecase "github.com/bloansbook/bloansbook-api/internal/staff/usecase"
+
 	"github.com/bloansbook/bloansbook-api/pkg/config"
 	"github.com/bloansbook/bloansbook-api/pkg/database"
 	"github.com/gofiber/fiber/v3"
@@ -27,10 +32,10 @@ func SetupRoutes(app *fiber.App) {
 	rolesRouter.SetupRoutes(api, rolesHandler)
 
 	// ===== STAFF MODULE (TODO: Add after staff implementation) =====
-	// staffRepo := staffRepository.NewStaffRepository(db, cfg)
-	// staffUsecase := staffUsecase.NewStaffUsecase(staffRepo)
-	// staffHandler := staffHandler.NewStaffHandler(staffUsecase)
-	// staffRouter.SetupRoutes(api, staffHandler)
+	staffRepo := staffRepo.NewStaffRepository(db, cfg)
+	staffUsecase := staffUsecase.NewStaffUsecase(db, staffRepo, cfg)
+	staffHandler := staffHandler.NewStaffHandler(staffUsecase)
+	staffRouter.SetupRoutes(api, staffHandler)
 
 	// ===== AUTH MODULE (TODO: Add after auth implementation) =====
 	// authHandler := authHandler.NewAuthHandler(authUsecase)
