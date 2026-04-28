@@ -27,9 +27,17 @@ func (s *StaffRepository) CountStaff(ctx context.Context) (int, error) {
 	stmt := `SELECT COUNT(*) FROM staff`
 
 	var count int
-	err := s.db.QueryRow(ctx, stmt).Scan(&count)
+	rows, err := s.db.Query(ctx, stmt)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count staff: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(&count)
+		if err != nil {
+			return 0, fmt.Errorf("failed to scan count: %w", err)
+		}
 	}
 
 	return count, nil
@@ -45,8 +53,8 @@ func (s *StaffRepository) CreateStaff(ctx context.Context, createdBy uuid.UUID, 
 	`
 
 	var exists bool
-	checkStmt := `SELECT EXISTS(SELECT 1 FROM staff WHERE staff_id = @staff_id)`
-	err := s.db.QueryRow(ctx, checkStmt, pgx.NamedArgs{"staff_id": credentials.StaffID}).Scan(&exists)
+	checkStmt := `SELECT EXISTS(SELECT 1 FROM staff WHERE staff_id = $1)`
+	err := s.db.QueryRow(ctx, checkStmt, credentials.StaffID).Scan(&exists)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if staff exists: %w", err)
 	}
@@ -101,8 +109,8 @@ func (s *StaffRepository) CreateStaffWithFixedID(ctx context.Context, id, create
 	`
 
 	var exists bool
-	checkStmt := `SELECT EXISTS(SELECT 1 FROM staff WHERE staff_id = @staff_id)`
-	err := s.db.QueryRow(ctx, checkStmt, pgx.NamedArgs{"staff_id": credentials.StaffID}).Scan(&exists)
+	checkStmt := `SELECT EXISTS(SELECT 1 FROM staff WHERE staff_id = $1)`
+	err := s.db.QueryRow(ctx, checkStmt, credentials.StaffID).Scan(&exists)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if staff exists: %w", err)
 	}
@@ -158,12 +166,10 @@ func (s *StaffRepository) GetStaffByID(ctx context.Context, id uuid.UUID) (*staf
 			s.superbase_uid, s.created_at, s.updated_at, creator.id AS creator_id, creator.staff_id AS creator_staff_id, creator.first_name AS creator_first_name, creator.last_name AS creator_last_name, creator.email AS creator_email, creator.phone AS creator_phone, creator.department AS creator_department, creator.job_title AS creator_job_title, creator.status AS creator_status
 		FROM staff s
 		LEFT JOIN staff creator ON s.created_by = creator.id
-		WHERE s.id = @id
+		WHERE s.id = $1
 	`
 
-	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
-		"id": id,
-	})
+	rows, err := s.db.Query(ctx, stmt, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for getting staff by ID: %w", err)
 	}
@@ -180,12 +186,10 @@ func (s *StaffRepository) GetStaffByStaffID(ctx context.Context, staffID string)
 	stmt := `
 		SELECT id, staff_id, first_name, last_name, email, phone, department, job_title, created_at, updated_at
 		FROM staff
-		WHERE staff_id = @staff_id
+		WHERE staff_id = $1
 	`
 
-	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
-		"staff_id": staffID,
-	})
+	rows, err := s.db.Query(ctx, stmt, staffID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for getting staff by staff_id: %w", err)
 	}
@@ -201,23 +205,21 @@ func (s *StaffRepository) GetStaffByStaffID(ctx context.Context, staffID string)
 // GetAllStaff retrieves all staff members with pagination
 func (s *StaffRepository) GetAllStaff(ctx context.Context, limit, offset int) ([]staff.Staff, error) {
 	stmt := `
-		SELECT id, staff_id, first_name, last_name, email, phone, address, date_of_birth, date_of_hire,
-		       emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number,
-		       bank_account_name, department, job_title, pay_type, base_salary, status, fired_at,
-		       has_login, superbase_uid, created_by, created_at, updated_at
-		FROM staff
+		SELECT
+			s.id, s.password_hash, s.staff_id, s.first_name, s.last_name, s.email, s.phone, s.address, s.date_of_birth, s.date_of_hire,
+			s.emergency_contact_name, s.emergency_contact_phone, s.bank_name, s.bank_account_number,
+			s.bank_account_name, s.department, s.job_title, s.pay_type, s.base_salary, s.status, s.fired_at,
+			s.has_login, s.superbase_uid, s.created_at, s.updated_at, creator.id AS creator_id, creator.staff_id AS creator_staff_id, creator.first_name AS creator_first_name, creator.last_name AS creator_last_name, creator.email AS creator_email, creator.phone AS creator_phone, creator.department AS creator_department, creator.job_title AS creator_job_title, creator.status AS creator_status
+		FROM staff s
+		LEFT JOIN staff creator ON s.created_by = creator.id
 		ORDER BY created_at DESC
-		LIMIT @limit OFFSET @offset
+		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
-		"limit":  limit,
-		"offset": offset,
-	})
+	rows, err := s.db.Query(ctx, stmt, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all staff: %w", err)
 	}
-	defer rows.Close()
 
 	staffList, err := pgx.CollectRows(rows, pgx.RowToStructByName[staff.Staff])
 	if err != nil {
@@ -228,32 +230,29 @@ func (s *StaffRepository) GetAllStaff(ctx context.Context, limit, offset int) ([
 }
 
 // UpdateStaff updates staff member information
-func (s *StaffRepository) UpdateStaff(ctx context.Context, id uuid.UUID, payload *staff.UpdateStaffPayload) (*staff.Staff, error) {
+func (s *StaffRepository) UpdateStaff(ctx context.Context, id uuid.UUID, payload *staff.UpdateStaffPayload) (*staff.StaffCreate, error) {
 	stmt := `
 		UPDATE staff
 		SET
-		    first_name = @first_name,
-		    last_name = @last_name,
-		    email = @email,
-		    phone = @phone,
-		    address = @address,
-		    date_of_birth = @date_of_birth,
-		    emergency_contact_name = @emergency_contact_name,
-		    emergency_contact_phone = @emergency_contact_phone,
-		    bank_name = @bank_name,
-		    bank_account_number = @bank_account_number,
-		    bank_account_name = @bank_account_name,
-		    department = @department,
-		    job_title = @job_title,
-		    pay_type = @pay_type,
-		    base_salary = @base_salary,
-		    status = @status,
+		    first_name = COALESCE(@first_name, first_name),
+		    last_name = COALESCE(@last_name, last_name),
+		    email = COALESCE(@email, email),
+		    phone = COALESCE(@phone, phone),
+		    address = COALESCE(@address, address),
+		    date_of_birth = COALESCE(@date_of_birth, date_of_birth),
+		    emergency_contact_name = COALESCE(@emergency_contact_name, emergency_contact_name),
+		    emergency_contact_phone = COALESCE(@emergency_contact_phone, emergency_contact_phone),
+		    bank_name = COALESCE(@bank_name, bank_name),
+		    bank_account_number = COALESCE(@bank_account_number, bank_account_number),
+		    bank_account_name = COALESCE(@bank_account_name, bank_account_name),
+		    department = COALESCE(@department, department),
+		    job_title = COALESCE(@job_title, job_title),
+		    pay_type = COALESCE(@pay_type, pay_type),
+		    base_salary = COALESCE(@base_salary, base_salary),
+		    status = COALESCE(@status, status),
 		    updated_at = NOW()
 		WHERE id = @id
-		RETURNING id, staff_id, first_name, last_name, email, phone, address, date_of_birth, date_of_hire,
-		         emergency_contact_name, emergency_contact_phone, bank_name, bank_account_number,
-		         bank_account_name, department, job_title, pay_type, base_salary, status, fired_at,
-		         has_login, superbase_uid, created_by, created_at, updated_at
+		RETURNING id, staff_id, first_name, last_name, email, phone, department, job_title, status, created_at, updated_at
 	`
 
 	rows, err := s.db.Query(ctx, stmt, pgx.NamedArgs{
@@ -279,7 +278,7 @@ func (s *StaffRepository) UpdateStaff(ctx context.Context, id uuid.UUID, payload
 		return nil, fmt.Errorf("failed to update staff: %w", err)
 	}
 
-	updatedStaff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.Staff])
+	updatedStaff, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[staff.StaffCreate])
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect updated staff: %w", err)
 	}
