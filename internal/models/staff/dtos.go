@@ -114,5 +114,6 @@ type UpdateStaffPayload struct {
 type UpdateStaffResponse struct {
 	ID        uuid.UUID    `json:"id"`
 	Staff     StaffSummary `json:"staff"`
+	CreatedAt time.Time    `json:"createdAt"`
 	UpdatedAt time.Time    `json:"updatedAt"`
 }
