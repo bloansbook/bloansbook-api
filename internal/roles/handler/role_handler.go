@@ -71,8 +71,8 @@ func (r *RolesHandler) AssignPermissionToRole(c fiber.Ctx) error {
 }
 
 func (r *RolesHandler) GetAllRoles(c fiber.Ctx) error {
-	limit := fiber.Query[int](c, "limit", 10)
-	offset := fiber.Query[int](c, "offset", 0)
+	limit := fiber.Query(c, "limit", 10)
+	offset := fiber.Query(c, "offset", 0)
 
 	roles, err := r.usecase.GetAllRoles(c.Context(), limit, offset)
 	if err != nil {
