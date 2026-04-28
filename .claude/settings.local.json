@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/hp/Desktop/Paul/bloansbook/**)"
+    ]
+  }
+}
