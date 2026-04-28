@@ -32,6 +32,16 @@ func NewStaffUsecase(db *pgxpool.Pool, repo *repository.StaffRepository, config 
 	}
 }
 
+// Get Count of staff members
+func (u *StaffUsecase) GetStaffCount(ctx context.Context) (int, error) {
+	count, err := u.repository.CountStaff(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count staff: %w", err)
+	}
+
+	return count, nil
+}
+
 // CreateStaff creates a new staff member
 func (u *StaffUsecase) CreateStaff(ctx context.Context, createdBy uuid.UUID, payload *staff.CreateStaffPayload) (*staff.CreateStaffResponse, error) {
 	// Count staff table
@@ -163,7 +173,7 @@ func (u *StaffUsecase) GetStaffByID(ctx context.Context, id uuid.UUID) (*staff.S
 }
 
 // GetAllStaff retrieves all staff members with pagination
-func (u *StaffUsecase) GetAllStaff(ctx context.Context, limit, offset int) ([]staff.Staff, error) {
+func (u *StaffUsecase) GetAllStaff(ctx context.Context, limit, offset int) ([]staff.StaffDTO, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -176,11 +186,50 @@ func (u *StaffUsecase) GetAllStaff(ctx context.Context, limit, offset int) ([]st
 		return nil, fmt.Errorf("failed to get staff members: %w", err)
 	}
 
-	return staffMembers, nil
+	staffDTOs := make([]staff.StaffDTO, len(staffMembers))
+	for i, m := range staffMembers {
+		staffDTOs[i] = staff.StaffDTO{
+			ID:                    m.ID,
+			StaffID:               m.StaffID,
+			FirstName:             m.FirstName,
+			LastName:              m.LastName,
+			Email:                 m.Email,
+			Phone:                 m.Phone,
+			Address:               m.Address,
+			DateOfBirth:           m.DateOfBirth,
+			DateOfHire:            m.DateOfHire,
+			EmergencyContactName:  m.EmergencyContactName,
+			EmergencyContactPhone: m.EmergencyContactPhone,
+			BankName:              m.BankName,
+			BankAccountNumber:     m.BankAccountNumber,
+			BankAccountName:       m.BankAccountName,
+			Department:            m.Department,
+			JobTitle:              m.JobTitle,
+			PayType:               m.PayType,
+			BaseSalary:            m.BaseSalary,
+			Status:                m.Status,
+			FiredAt:               m.FiredAt,
+			HasLogin:              m.HasLogin,
+			CreatedBy: staff.StaffSummary{
+				StaffID:    m.CreatorStaffID,
+				FirstName:  m.CreatorFirstName,
+				LastName:   m.CreatorLastName,
+				Email:      m.CreatorEmail,
+				Phone:      m.CreatorPhone,
+				Department: m.CreatorDepartment,
+				JobTitle:   m.CreatorJobTitle,
+				Status:     m.CreatorStatus,
+			},
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+		}
+	}
+
+	return staffDTOs, nil
 }
 
 // UpdateStaff updates staff member information
-func (u *StaffUsecase) UpdateStaff(ctx context.Context, id uuid.UUID, payload *staff.UpdateStaffPayload) (*staff.Staff, error) {
+func (u *StaffUsecase) UpdateStaff(ctx context.Context, id uuid.UUID, payload *staff.UpdateStaffPayload) (*staff.UpdateStaffResponse, error) {
 	// Validate staff exists
 	_, err := u.repository.GetStaffByID(ctx, id)
 	if err != nil {
@@ -192,7 +241,21 @@ func (u *StaffUsecase) UpdateStaff(ctx context.Context, id uuid.UUID, payload *s
 		return nil, fmt.Errorf("failed to update staff: %w", err)
 	}
 
-	return updatedStaff, nil
+	return &staff.UpdateStaffResponse{
+		ID: updatedStaff.ID,
+		Staff: staff.StaffSummary{
+			StaffID:    updatedStaff.StaffID,
+			FirstName:  updatedStaff.FirstName,
+			LastName:   updatedStaff.LastName,
+			Email:      updatedStaff.Email,
+			Phone:      updatedStaff.Phone,
+			Department: updatedStaff.Department,
+			JobTitle:   updatedStaff.JobTitle,
+			Status:     updatedStaff.Status,
+		},
+		CreatedAt: updatedStaff.CreatedAt,
+		UpdatedAt: updatedStaff.UpdatedAt,
+	}, nil
 }
 
 func (u *StaffUsecase) getOrCreateSystemStaff(ctx context.Context) (*staff.CreateStaffResponse, error) {
