@@ -42,15 +42,11 @@ func (r *RolesRepository) ValidateRoleExists(ctx context.Context, roleID uuid.UU
 func (r *RolesRepository) CreateRole(ctx context.Context, payload *roles.CreateRolePayload) (*roles.Roles, error) {
 	stmt := `
 		INSERT INTO roles (name, description, is_system)
-		VALUES (@name, @description, @is_system)
+		VALUES ($1, $2, $3)
 		RETURNING *
 	`
 
-	rows, err := r.db.Query(ctx, stmt, pgx.NamedArgs{
-		"name":        payload.Name,
-		"description": payload.Description,
-		"is_system":   payload.IsSystem,
-	})
+	rows, err := r.db.Query(ctx, stmt, payload.Name, payload.Description, payload.IsSystem)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for creating role: %w", err)
 	}
@@ -66,15 +62,11 @@ func (r *RolesRepository) CreateRole(ctx context.Context, payload *roles.CreateR
 func (r *RolesRepository) CreatePermission(ctx context.Context, payload *roles.CreatePermissionPayload) (*roles.Permissions, error) {
 	stmt := `
 		INSERT INTO permissions (code, module, description)
-		VALUES (@code, @module, @description)
+		VALUES ($1, $2, $3)
 		RETURNING *
 	`
 
-	rows, err := r.db.Query(ctx, stmt, pgx.NamedArgs{
-		"code":        payload.Code,
-		"module":      payload.Module,
-		"description": payload.Description,
-	})
+	rows, err := r.db.Query(ctx, stmt, payload.Code, payload.Module, payload.Description)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for creating permission: %w", err)
 	}
@@ -91,7 +83,7 @@ func (r *RolesRepository) CreateRolePermission(ctx context.Context, payload *rol
 	stmt := `
 		WITH inserted AS (
 			INSERT INTO role_permissions (role_id, permission_id)
-			VALUES (@role_id, @permission_id)
+			VALUES ($1, $2)
 			RETURNING role_id, permission_id, created_at
 		)
 		SELECT
@@ -106,10 +98,7 @@ func (r *RolesRepository) CreateRolePermission(ctx context.Context, payload *rol
 		JOIN permissions ON permissions.id = inserted.permission_id
 	`
 
-	rows, err := r.db.Query(ctx, stmt, pgx.NamedArgs{
-		"role_id":       payload.RoleID,
-		"permission_id": payload.PermissionID,
-	})
+	rows, err := r.db.Query(ctx, stmt, payload.RoleID, payload.PermissionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for creating role permission: %w", err)
 	}
@@ -139,11 +128,9 @@ func (r *RolesRepository) GetAllRoles(ctx context.Context) ([]roles.Roles, error
 }
 
 func (r *RolesRepository) GetRoleByName(ctx context.Context, name string) (*roles.Roles, error) {
-	stmt := `SELECT * FROM roles WHERE name = @name`
+	stmt := `SELECT * FROM roles WHERE name = $1`
 
-	rows, err := r.db.Query(ctx, stmt, pgx.NamedArgs{
-		"name": name,
-	})
+	rows, err := r.db.Query(ctx, stmt, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for getting role by name: %w", err)
 	}
@@ -174,13 +161,11 @@ func (r *RolesRepository) GetRoleWithPermissions(ctx context.Context, roleID uui
 	FROM roles r
 	LEFT JOIN role_permissions rp ON r.id = rp.role_id
 	LEFT JOIN permissions p ON rp.permission_id = p.id
-	WHERE r.id = @role_id
+	WHERE r.id = $1
 	GROUP BY r.id, r.name
 	`
 
-	rows, err := r.db.Query(ctx, stmt, pgx.NamedArgs{
-		"role_id": roleID,
-	})
+	rows, err := r.db.Query(ctx, stmt, roleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for getting role with permissions: %w", err)
 	}
@@ -212,13 +197,10 @@ func (r *RolesRepository) GetAllRolesWithPermissions(ctx context.Context, limit,
 	LEFT JOIN permissions p ON rp.permission_id = p.id
 	GROUP BY r.id, r.name
 	ORDER BY r.name
-	LIMIT @limit OFFSET @offset
+	LIMIT $1 OFFSET $2
 	`
 
-	rows, err := r.db.Query(ctx, stmt, pgx.NamedArgs{
-		"limit":  limit,
-		"offset": offset,
-	})
+	rows, err := r.db.Query(ctx, stmt, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query for getting all roles with permissions: %w", err)
 	}
