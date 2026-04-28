@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/bloansbook/bloansbook-api/internal/models"
 	"github.com/bloansbook/bloansbook-api/internal/models/staff"
 	"github.com/bloansbook/bloansbook-api/internal/staff/usecase"
 	"github.com/bloansbook/bloansbook-api/pkg/response"
@@ -55,4 +56,54 @@ func (h *StaffHandler) GetStaffById(c fiber.Ctx) error {
 	}
 
 	return response.Success(c, sysmsg.StaffFetched, staff, fiber.StatusOK)
+}
+
+func (h *StaffHandler) GetAllStaff(c fiber.Ctx) error {
+	totalCount, err := h.usecase.GetStaffCount(c.Context())
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	limit := fiber.Query(c, "limit", 10)
+	offset := fiber.Query(c, "offset", 0)
+
+	staffList, err := h.usecase.GetAllStaff(c.Context(), limit, offset)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	data := models.DataWithPagination{
+		Data:       staffList,
+		Count:      len(staffList),
+		TotalCount: totalCount,
+		Limit:      limit,
+		Offset:     offset,
+	}
+
+	return response.Success(c, sysmsg.StaffListFetched, data, fiber.StatusOK)
+}
+
+func (h *StaffHandler) UpdateStaff(c fiber.Ctx) error {
+	staffID := c.Params("id")
+
+	var payload staff.UpdateStaffPayload
+	if err := c.Bind().Body(&payload); err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	if staffID == "" {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	id, err := uuid.Parse(staffID)
+	if err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	staff, err := h.usecase.UpdateStaff(c.Context(), id, &payload)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return response.Success(c, sysmsg.StaffUpdated, staff, fiber.StatusOK)
 }
