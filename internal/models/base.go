@@ -35,3 +35,11 @@ const (
 	StatusActive   BaseStatus = "active"
 	StatusInactive BaseStatus = "inactive"
 )
+
+type DataWithPagination struct {
+	Data       interface{} `json:"data_items"`
+	Count      int         `json:"count"`
+	TotalCount int         `json:"total_count"`
+	Limit      int         `json:"limit"`
+	Offset     int         `json:"offset"`
+}
