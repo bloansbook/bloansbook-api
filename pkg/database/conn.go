@@ -6,6 +6,7 @@ import (
 
 	"github.com/bloansbook/bloansbook-api/pkg/config"
 	"github.com/bloansbook/bloansbook-api/pkg/sysmsg"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -14,7 +15,12 @@ var Pool *pgxpool.Pool
 func Connect() {
 	var err error
 
-	Pool, err = pgxpool.New(context.Background(), config.ApplicationConfig.Database.URL)
+	config, _ := pgxpool.ParseConfig(config.ApplicationConfig.Database.URL)
+
+	config.ConnConfig.StatementCacheCapacity = 0
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	Pool, err = pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Fatalf("%s: %v\n", sysmsg.CannotConnect, err)
 	}
