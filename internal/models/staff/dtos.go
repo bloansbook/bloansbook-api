@@ -3,6 +3,7 @@ package staff
 import (
 	"time"
 
+	"github.com/bloansbook/bloansbook-api/internal/models/roles"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
@@ -37,6 +38,8 @@ type StaffDTO struct {
 	HasLogin bool `json:"hasLogin" db:"has_login"`
 
 	CreatedBy StaffSummary `json:"createdBy" db:"created_by"`
+
+	Roles []roles.RoleSummary `json:"roles"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -74,7 +77,8 @@ type CreateStaffPayload struct {
 	PayType    string          `json:"payType" validate:"required"`
 	BaseSalary decimal.Decimal `json:"baseSalary" validate:"required"`
 
-	HasLogin bool `json:"hasLogin"`
+	HasLogin    bool    `json:"hasLogin"`
+	SupabaseUID *string `json:"supabaseUID"`
 
 	Status StaffStatus `json:"status" validate:"required,oneof=active inactive fired"`
 }
