@@ -50,8 +50,8 @@ type Staff struct {
 	Status  StaffStatus `json:"status" db:"status"`
 	FiredAt *time.Time  `json:"firedAt,omitempty" db:"fired_at"`
 
-	HasLogin     bool    `json:"hasLogin" db:"has_login"`
-	SuperbaseUID *string `json:"superbaseUID" db:"superbase_uid"`
+	HasLogin    bool    `json:"hasLogin" db:"has_login"`
+	SupabaseUID *string `json:"supabaseUID" db:"supabase_uid"`
 
 	CreatorID         uuid.UUID   `db:"creator_id"`
 	CreatorStaffID    string      `db:"creator_staff_id"`
