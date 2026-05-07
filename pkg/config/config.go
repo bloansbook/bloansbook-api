@@ -26,9 +26,11 @@ type DatabaseConfig struct {
 }
 
 type SupabaseConfig struct {
-	URL       string
-	AnonKey   string
-	JWTSecret string
+	ProjectRef     string
+	URL            string
+	AnonKey        string
+	ServiceRoleKey string
+	JWTSecret      string
 }
 
 type ResendConfig struct {
@@ -61,9 +63,11 @@ func Load() {
 			URL: viper.GetString("DATABASE_URL"),
 		},
 		Supabase: SupabaseConfig{
-			URL:       viper.GetString("SUPABASE_URL"),
-			AnonKey:   viper.GetString("SUPABASE_ANON_KEY"),
-			JWTSecret: viper.GetString("JWT_SECRET"),
+			ProjectRef:     viper.GetString("SUPABASE_PROJECT_REF"),
+			URL:            viper.GetString("SUPABASE_URL"),
+			AnonKey:        viper.GetString("SUPABASE_ANON_KEY"),
+			ServiceRoleKey: viper.GetString("SUPABASE_SERVICE_ROLE_KEY"),
+			JWTSecret:      viper.GetString("JWT_SECRET"),
 		},
 		Resend: ResendConfig{
 			APIKey: viper.GetString("RESEND_API_KEY"),
