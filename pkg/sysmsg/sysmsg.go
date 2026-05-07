@@ -28,6 +28,7 @@ const (
 const (
 	LoginSuccess       = "Login successful"
 	LogoutSuccess      = "Logout successful"
+	NoLoginAccess      = "Staff does not have login access"
 	InvalidCredentials = "Invalid Staff ID or password"
 	AccessDenied       = "Access denied"
 	TokenExpired       = "Session expired. Please log in again"
