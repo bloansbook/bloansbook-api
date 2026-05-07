@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS staff (
     fired_at TIMESTAMPTZ,
 
     has_login boolean NOT NULL DEFAULT FALSE,
-    superbase_uid TEXT UNIQUE,
+    supabase_uid TEXT UNIQUE,
 
     created_by UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS staff (
     CONSTRAINT valid_status CHECK (status IN ('active', 'inactive', 'fired'))
 );
 CREATE INDEX idx_staff_login ON staff(has_login, staff_id, status);
-CREATE INDEX idx_staff_superbase_uid ON staff(superbase_uid);
+CREATE INDEX idx_staff_supabase_uid ON staff(supabase_uid);
 CREATE INDEX idx_staff_active_login ON staff(has_login, staff_id) WHERE status = 'active';
 
 CREATE TABLE IF NOT EXISTS fired_staff (
