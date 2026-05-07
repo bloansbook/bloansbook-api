@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bloansbook/bloansbook-api/internal/auth"
+	a "github.com/bloansbook/bloansbook-api/internal/auth/repository"
+	"github.com/bloansbook/bloansbook-api/internal/models/roles"
 	"github.com/bloansbook/bloansbook-api/internal/models/staff"
 	"github.com/bloansbook/bloansbook-api/internal/staff/repository"
 	"github.com/bloansbook/bloansbook-api/pkg/config"
@@ -18,17 +21,19 @@ import (
 
 // StaffUsecase handles staff business logic
 type StaffUsecase struct {
+	authRepo   *a.AuthRepository
 	repository *repository.StaffRepository
 	db         *pgxpool.Pool
 	config     *config.Config
 }
 
 // NewStaffUsecase creates a new staff usecase
-func NewStaffUsecase(db *pgxpool.Pool, repo *repository.StaffRepository, config *config.Config) *StaffUsecase {
+func NewStaffUsecase(db *pgxpool.Pool, auth *a.AuthRepository, repo *repository.StaffRepository, config *config.Config) *StaffUsecase {
 	return &StaffUsecase{
 		repository: repo,
 		db:         db,
 		config:     config,
+		authRepo:   auth,
 	}
 }
 
@@ -73,6 +78,24 @@ func (u *StaffUsecase) CreateStaff(ctx context.Context, createdBy uuid.UUID, pay
 	pass, err := password.GeneratePassword()
 	if err != nil {
 		return nil, fmt.Errorf("%w", err)
+	}
+
+	// Create Supabase Auth
+	supabasePayload := auth.LoginDTO{
+		StaffID:  staffID,
+		Password: pass,
+	}
+
+	// fmt.Print(supabasePayload)
+
+	if payload.HasLogin {
+		res, err := u.authRepo.AdminCreateUser(ctx, supabasePayload)
+		if err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+
+		supabaseUID := fmt.Sprintf("%s", res.User.ID)
+		payload.SupabaseUID = &supabaseUID
 	}
 
 	// Hash password
@@ -135,6 +158,12 @@ func (u *StaffUsecase) GetStaffByID(ctx context.Context, id uuid.UUID) (*staff.S
 		return nil, fmt.Errorf("failed to get staff: %w", err)
 	}
 
+	staffRoles, err := u.repository.GetStaffRoles(ctx, staffMember.ID)
+	if err != nil {
+		fmt.Printf("Warning: failed to fetch roles for staff %s: %v\n", staffMember.ID, err)
+		staffRoles = []roles.RoleSummary{}
+	}
+
 	return &staff.StaffDTO{
 		ID:                    staffMember.ID,
 		StaffID:               staffMember.StaffID,
@@ -167,6 +196,7 @@ func (u *StaffUsecase) GetStaffByID(ctx context.Context, id uuid.UUID) (*staff.S
 			JobTitle:   staffMember.CreatorJobTitle,
 			Status:     staffMember.CreatorStatus,
 		},
+		Roles:     staffRoles,
 		CreatedAt: staffMember.CreatedAt,
 		UpdatedAt: staffMember.UpdatedAt,
 	}, nil
