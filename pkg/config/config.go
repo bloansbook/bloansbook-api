@@ -35,6 +35,7 @@ type SupabaseConfig struct {
 
 type ResendConfig struct {
 	APIKey string
+	From   string
 }
 
 type IDGenConfig struct {
@@ -71,6 +72,7 @@ func Load() {
 		},
 		Resend: ResendConfig{
 			APIKey: viper.GetString("RESEND_API_KEY"),
+			From:   viper.GetString("FROM_EMAIL_ADDRESS"),
 		},
 		IDGen: IDGenConfig{
 			StaffPrefix:    viper.GetString("STAFF_ID_PREFIX"),
