@@ -1,13 +1,12 @@
 package email
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"html"
 
 	"github.com/bloansbook/bloansbook-api/pkg/config"
+	"github.com/resend/resend-go/v3"
 )
 
 // Service handles email sending via Resend API
@@ -17,24 +16,11 @@ type Service struct {
 }
 
 // NewService creates a new email service
-func NewService(cfg *config.ResendConfig, fromEmail string) *Service {
+func NewService(fromEmail string) *Service {
 	return &Service{
-		apiKey: cfg.APIKey,
+		apiKey: config.ApplicationConfig.Resend.APIKey,
 		from:   fromEmail,
 	}
-}
-
-// ResendRequest represents the request body for Resend API
-type ResendRequest struct {
-	From    string   `json:"from"`
-	To      []string `json:"to"`
-	Subject string   `json:"subject"`
-	HTML    string   `json:"html"`
-}
-
-// ResendResponse represents the response from Resend API
-type ResendResponse struct {
-	ID string `json:"id"`
 }
 
 // SendEmail sends an email using the Resend API
@@ -43,37 +29,18 @@ func (s *Service) SendEmail(ctx context.Context, to []string, subject, htmlConte
 		return fmt.Errorf("Resend API key is not configured")
 	}
 
-	reqBody := ResendRequest{
+	client := resend.NewClient(s.apiKey)
+
+	params := &resend.SendEmailRequest{
 		From:    s.from,
 		To:      to,
 		Subject: subject,
-		HTML:    htmlContent,
+		Html:    htmlContent,
 	}
-
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.resend.com/emails", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.apiKey)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	_, err := client.Emails.Send(params)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to send email: status code %d", resp.StatusCode)
-	}
-
 	return nil
 }
 
