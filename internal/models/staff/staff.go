@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/bloansbook/bloansbook-api/internal/models"
+	"github.com/bloansbook/bloansbook-api/internal/models/roles"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
@@ -110,4 +111,76 @@ type StaffRoleHistory struct {
 
 	PerformedBy uuid.UUID `json:"performedBy" db:"performed_by"`
 	Reason      *string   `json:"reason,omitempty" db:"reason"`
+}
+
+// ToSummary converts a Staff to its compact summary shape.
+func (s *Staff) ToSummary() StaffSummary {
+	return StaffSummary{
+		StaffID:    s.StaffID,
+		FirstName:  s.FirstName,
+		LastName:   s.LastName,
+		Email:      s.Email,
+		Phone:      s.Phone,
+		Department: s.Department,
+		JobTitle:   s.JobTitle,
+		Status:     s.Status,
+	}
+}
+
+// ToDTO converts a Staff to the full StaffDTO response shape.
+// staffRoles should be passed in from a separate query; pass nil for an empty list.
+func (s *Staff) ToDTO(staffRoles []roles.RoleSummary) StaffDTO {
+	if staffRoles == nil {
+		staffRoles = []roles.RoleSummary{}
+	}
+	return StaffDTO{
+		ID:                    s.ID,
+		StaffID:               s.StaffID,
+		FirstName:             s.FirstName,
+		LastName:              s.LastName,
+		Email:                 s.Email,
+		Phone:                 s.Phone,
+		Address:               s.Address,
+		DateOfBirth:           s.DateOfBirth,
+		DateOfHire:            s.DateOfHire,
+		EmergencyContactName:  s.EmergencyContactName,
+		EmergencyContactPhone: s.EmergencyContactPhone,
+		BankName:              s.BankName,
+		BankAccountNumber:     s.BankAccountNumber,
+		BankAccountName:       s.BankAccountName,
+		Department:            s.Department,
+		JobTitle:              s.JobTitle,
+		PayType:               s.PayType,
+		BaseSalary:            s.BaseSalary,
+		Status:                s.Status,
+		FiredAt:               s.FiredAt,
+		HasLogin:              s.HasLogin,
+		CreatedBy: StaffSummary{
+			StaffID:    s.CreatorStaffID,
+			FirstName:  s.CreatorFirstName,
+			LastName:   s.CreatorLastName,
+			Email:      s.CreatorEmail,
+			Phone:      s.CreatorPhone,
+			Department: s.CreatorDepartment,
+			JobTitle:   s.CreatorJobTitle,
+			Status:     s.CreatorStatus,
+		},
+		Roles:     staffRoles,
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
+	}
+}
+
+// ToSummary converts a StaffCreate to its compact summary shape.
+func (s *StaffCreate) ToSummary() StaffSummary {
+	return StaffSummary{
+		StaffID:    s.StaffID,
+		FirstName:  s.FirstName,
+		LastName:   s.LastName,
+		Email:      s.Email,
+		Phone:      s.Phone,
+		Department: s.Department,
+		JobTitle:   s.JobTitle,
+		Status:     s.Status,
+	}
 }
