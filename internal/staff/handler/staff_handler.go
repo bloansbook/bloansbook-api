@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/bloansbook/bloansbook-api/internal/auth/middleware"
 	"github.com/bloansbook/bloansbook-api/internal/models"
 	"github.com/bloansbook/bloansbook-api/internal/models/staff"
 	"github.com/bloansbook/bloansbook-api/internal/staff/usecase"
@@ -8,8 +9,6 @@ import (
 	"github.com/bloansbook/bloansbook-api/pkg/sysmsg"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
-
-	"fmt"
 )
 
 type StaffHandler struct {
@@ -24,14 +23,21 @@ func NewStaffHandler(u *usecase.StaffUsecase) *StaffHandler {
 
 func (h *StaffHandler) CreateStaff(c fiber.Ctx) error {
 	var payload staff.CreateStaffPayload
-	var createdBy uuid.UUID
+	createdBy, ok := middleware.CallerStaffID(c)
+	if !ok {
+		return response.Error(c, sysmsg.Unauthorized, fiber.StatusUnauthorized)
+	}
+
+	id, ok := createdBy.(uuid.UUID)
+	if !ok {
+		return response.Error(c, sysmsg.Unauthorized, fiber.StatusUnauthorized)
+	}
 
 	if err := c.Bind().Body(&payload); err != nil {
-		fmt.Printf("%v:", payload)
 		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
 	}
 
-	staff, err := h.usecase.CreateStaff(c.Context(), createdBy, &payload)
+	staff, err := h.usecase.CreateStaff(c.Context(), id, &payload)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
 	}
@@ -106,4 +112,95 @@ func (h *StaffHandler) UpdateStaff(c fiber.Ctx) error {
 	}
 
 	return response.Success(c, sysmsg.StaffUpdated, staff, fiber.StatusOK)
+}
+
+// --- Staff Role Handlers ---
+
+func (h *StaffHandler) AssignRole(c fiber.Ctx) error {
+	staffID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	performedBy, ok := middleware.CallerStaffID(c)
+	if !ok {
+		return response.Error(c, sysmsg.Unauthorized, fiber.StatusUnauthorized)
+	}
+	callerID := performedBy.(uuid.UUID)
+
+	var payload staff.AssignRolePayload
+	if err := c.Bind().Body(&payload); err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	result, err := h.usecase.AssignRole(c.Context(), staffID, payload.RoleID, callerID, payload.Reason)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return response.Success(c, sysmsg.RoleAssigned, result, fiber.StatusOK)
+}
+
+func (h *StaffHandler) RevokeRole(c fiber.Ctx) error {
+	staffID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	performedBy, ok := middleware.CallerStaffID(c)
+	if !ok {
+		return response.Error(c, sysmsg.Unauthorized, fiber.StatusUnauthorized)
+	}
+	callerID := performedBy.(uuid.UUID)
+
+	var payload staff.RevokeRolePayload
+	if err := c.Bind().Body(&payload); err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	result, err := h.usecase.RevokeRole(c.Context(), staffID, payload.RoleID, callerID, payload.Reason)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return response.Success(c, sysmsg.RoleRevoked, result, fiber.StatusOK)
+}
+
+func (h *StaffHandler) UpdateRole(c fiber.Ctx) error {
+	staffID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	performedBy, ok := middleware.CallerStaffID(c)
+	if !ok {
+		return response.Error(c, sysmsg.Unauthorized, fiber.StatusUnauthorized)
+	}
+	callerID := performedBy.(uuid.UUID)
+
+	var payload staff.UpdateRolePayload
+	if err := c.Bind().Body(&payload); err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	result, err := h.usecase.UpdateRole(c.Context(), staffID, callerID, &payload)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return response.Success(c, sysmsg.RoleAssigned, result, fiber.StatusOK)
+}
+
+func (h *StaffHandler) GetRoleHistory(c fiber.Ctx) error {
+	staffID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	history, err := h.usecase.GetRoleHistory(c.Context(), staffID)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return response.Success(c, sysmsg.RoleFetched, history, fiber.StatusOK)
 }
