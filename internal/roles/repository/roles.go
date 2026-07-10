@@ -7,7 +7,6 @@ import (
 	"github.com/bloansbook/bloansbook-api/internal/models/roles"
 	"github.com/bloansbook/bloansbook-api/pkg/config"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,25 +16,21 @@ type RolesRepository struct {
 }
 
 func NewRolesRepository(db *pgxpool.Pool, config *config.Config) *RolesRepository {
-	return &RolesRepository{
-		db:     db,
-		config: config,
-	}
+	return &RolesRepository{db: db, config: config}
 }
 
 func (r *RolesRepository) ValidateRoleExists(ctx context.Context, roleID uuid.UUID) error {
-	stmt := `SELECT EXISTS(SELECT 1 FROM roles WHERE id = @role_id)`
-
 	var exists bool
-	err := r.db.QueryRow(ctx, stmt, pgx.NamedArgs{"role_id": roleID}).Scan(&exists)
+	err := r.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM roles WHERE id = $1)`,
+		roleID,
+	).Scan(&exists)
 	if err != nil {
-		return fmt.Errorf("failed to check if role exists: %w", err)
+		return fmt.Errorf("failed to check role: %w", err)
 	}
-
 	if !exists {
-		return fmt.Errorf("role with ID %s does not exist", roleID)
+		return fmt.Errorf("role %s does not exist", roleID)
 	}
-
 	return nil
 }
 
@@ -43,40 +38,34 @@ func (r *RolesRepository) CreateRole(ctx context.Context, payload *roles.CreateR
 	stmt := `
 		INSERT INTO roles (name, description, is_system)
 		VALUES ($1, $2, $3)
-		RETURNING *
+		RETURNING id, name, description, is_system, created_at, updated_at
 	`
 
-	rows, err := r.db.Query(ctx, stmt, payload.Name, payload.Description, payload.IsSystem)
+	var m roles.Roles
+	err := r.db.QueryRow(ctx, stmt, payload.Name, payload.Description, payload.IsSystem).Scan(
+		&m.ID, &m.Name, &m.Description, &m.IsSystem, &m.CreatedAt, &m.UpdatedAt,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query for creating role: %w", err)
+		return nil, fmt.Errorf("failed to create role: %w", err)
 	}
-
-	role, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[roles.Roles])
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect created role: %w", err)
-	}
-
-	return &role, nil
+	return &m, nil
 }
 
 func (r *RolesRepository) CreatePermission(ctx context.Context, payload *roles.CreatePermissionPayload) (*roles.Permissions, error) {
 	stmt := `
 		INSERT INTO permissions (code, module, description)
 		VALUES ($1, $2, $3)
-		RETURNING *
+		RETURNING id, code, module, description, created_at
 	`
 
-	rows, err := r.db.Query(ctx, stmt, payload.Code, payload.Module, payload.Description)
+	var m roles.Permissions
+	err := r.db.QueryRow(ctx, stmt, payload.Code, payload.Module, payload.Description).Scan(
+		&m.ID, &m.Code, &m.Module, &m.Description, &m.CreatedAt,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query for creating permission: %w", err)
+		return nil, fmt.Errorf("failed to create permission: %w", err)
 	}
-
-	permission, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[roles.Permissions])
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect created permission: %w", err)
-	}
-
-	return &permission, nil
+	return &m, nil
 }
 
 func (r *RolesRepository) CreateRolePermission(ctx context.Context, payload *roles.CreateRolePermissionPayload) (*roles.RolePermissions, error) {
@@ -88,127 +77,121 @@ func (r *RolesRepository) CreateRolePermission(ctx context.Context, payload *rol
 		)
 		SELECT
 			inserted.created_at,
-			roles.id AS role_id,
-			permissions.id AS permission_id,
-			roles.name AS role_name,
-			permissions.code AS permission_code,
+			roles.id        AS role_id,
+			permissions.id  AS permission_id,
+			roles.name      AS role_name,
+			permissions.code   AS permission_code,
 			permissions.module AS permission_module
 		FROM inserted
-		JOIN roles ON roles.id = inserted.role_id
+		JOIN roles       ON roles.id       = inserted.role_id
 		JOIN permissions ON permissions.id = inserted.permission_id
 	`
 
-	rows, err := r.db.Query(ctx, stmt, payload.RoleID, payload.PermissionID)
+	var m roles.RolePermissions
+	err := r.db.QueryRow(ctx, stmt, payload.RoleID, payload.PermissionID).Scan(
+		&m.CreatedAt,
+		&m.RoleID, &m.PermissionID,
+		&m.Role, &m.PermissionCode, &m.PermissionModule,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query for creating role permission: %w", err)
+		return nil, fmt.Errorf("failed to assign permission to role: %w", err)
 	}
-
-	rolePermission, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[roles.RolePermissions])
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect created role permission: %w", err)
-	}
-
-	return &rolePermission, nil
-}
-
-func (r *RolesRepository) GetAllRoles(ctx context.Context) ([]roles.Roles, error) {
-	stmt := `SELECT * FROM roles`
-
-	rows, err := r.db.Query(ctx, stmt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute query for getting all roles: %w", err)
-	}
-
-	roles, err := pgx.CollectRows(rows, pgx.RowToStructByName[roles.Roles])
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect roles: %w", err)
-	}
-
-	return roles, nil
+	return &m, nil
 }
 
 func (r *RolesRepository) GetRoleByName(ctx context.Context, name string) (*roles.Roles, error) {
-	stmt := `SELECT * FROM roles WHERE name = $1`
+	stmt := `SELECT id, name, description, is_system, created_at, updated_at FROM roles WHERE name = $1`
 
-	rows, err := r.db.Query(ctx, stmt, name)
+	var m roles.Roles
+	err := r.db.QueryRow(ctx, stmt, name).Scan(
+		&m.ID, &m.Name, &m.Description, &m.IsSystem, &m.CreatedAt, &m.UpdatedAt,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query for getting role by name: %w", err)
+		return nil, fmt.Errorf("role not found: %w", err)
 	}
-
-	role, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[roles.Roles])
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect role by name: %w", err)
-	}
-
-	return &role, nil
+	return &m, nil
 }
 
 func (r *RolesRepository) GetRoleWithPermissions(ctx context.Context, roleID uuid.UUID) (*roles.RoleWithPermissions, error) {
 	stmt := `
-	SELECT
-		r.id,
-		r.name,
-		COALESCE(
-			json_agg(
-				json_build_object(
-					'id', p.id,
-					'code', p.code,
-					'module', p.module
-				) ORDER BY p.code
-			) FILTER (WHERE p.id IS NOT NULL),
-			'[]'::json
-		) AS permissions
-	FROM roles r
-	LEFT JOIN role_permissions rp ON r.id = rp.role_id
-	LEFT JOIN permissions p ON rp.permission_id = p.id
-	WHERE r.id = $1
-	GROUP BY r.id, r.name
+		SELECT
+			r.id,
+			r.name,
+			COALESCE(
+				json_agg(
+					json_build_object('id', p.id, 'code', p.code, 'module', p.module)
+					ORDER BY p.code
+				) FILTER (WHERE p.id IS NOT NULL),
+				'[]'::json
+			) AS permissions
+		FROM roles r
+		LEFT JOIN role_permissions rp ON r.id = rp.role_id
+		LEFT JOIN permissions p ON rp.permission_id = p.id
+		WHERE r.id = $1
+		GROUP BY r.id, r.name
 	`
 
-	rows, err := r.db.Query(ctx, stmt, roleID)
+	var m roles.RoleWithPermissions
+	err := r.db.QueryRow(ctx, stmt, roleID).Scan(&m.ID, &m.Name, &m.Permissions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query for getting role with permissions: %w", err)
+		return nil, fmt.Errorf("role not found: %w", err)
 	}
-
-	roleWithPermissions, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[roles.RoleWithPermissions])
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect role with permissions: %w", err)
-	}
-
-	return &roleWithPermissions, nil
+	return &m, nil
 }
 
 func (r *RolesRepository) GetAllRolesWithPermissions(ctx context.Context, limit, offset int) ([]roles.RoleWithPermissions, error) {
 	stmt := `
-	SELECT r.id,
-	r.name,
-	COALESCE(
-		json_agg(
-			json_build_object(
-				'id', p.id,
-				'code', p.code,
-				'module', p.module
-			) ORDER BY p.code
-		) FILTER (WHERE p.id IS NOT NULL),
-		 '[]'::json
-	) AS permissions
-	FROM roles r
-	LEFT JOIN role_permissions rp ON r.id = rp.role_id
-	LEFT JOIN permissions p ON rp.permission_id = p.id
-	GROUP BY r.id, r.name
-	ORDER BY r.name
-	LIMIT $1 OFFSET $2
+		SELECT
+			r.id,
+			r.name,
+			COALESCE(
+				json_agg(
+					json_build_object('id', p.id, 'code', p.code, 'module', p.module)
+					ORDER BY p.code
+				) FILTER (WHERE p.id IS NOT NULL),
+				'[]'::json
+			) AS permissions
+		FROM roles r
+		LEFT JOIN role_permissions rp ON r.id = rp.role_id
+		LEFT JOIN permissions p ON rp.permission_id = p.id
+		GROUP BY r.id, r.name
+		ORDER BY r.name
+		LIMIT $1 OFFSET $2
 	`
 
 	rows, err := r.db.Query(ctx, stmt, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query for getting all roles with permissions: %w", err)
+		return nil, fmt.Errorf("failed to get roles: %w", err)
 	}
+	defer rows.Close()
 
-	rolesWithPermissions, err := pgx.CollectRows(rows, pgx.RowToStructByName[roles.RoleWithPermissions])
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect roles with permissions: %w", err)
+	var list []roles.RoleWithPermissions
+	for rows.Next() {
+		var m roles.RoleWithPermissions
+		if err := rows.Scan(&m.ID, &m.Name, &m.Permissions); err != nil {
+			return nil, fmt.Errorf("failed to scan role: %w", err)
+		}
+		list = append(list, m)
 	}
-
-	return rolesWithPermissions, nil
+	return list, nil
 }
+
+func (r *RolesRepository) GetAllRoles(ctx context.Context) ([]roles.Roles, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, name, description, is_system, created_at, updated_at FROM roles`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get roles: %w", err)
+	}
+	defer rows.Close()
+
+	var list []roles.Roles
+	for rows.Next() {
+		var m roles.Roles
+		if err := rows.Scan(&m.ID, &m.Name, &m.Description, &m.IsSystem, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan role: %w", err)
+		}
+		list = append(list, m)
+	}
+	return list, nil
+}
+
+
