@@ -21,51 +21,26 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// SetupRoutes initializes all API route modules
 func SetupRoutes(app *fiber.App) {
-	// Get shared dependencies
 	db := database.Pool
 	cfg := config.ApplicationConfig
 
-	// Create API group
 	api := app.Group("/api/v1")
 
-	// ===== AUTH MODULE (TODO: Add after auth implementation) =====
+	// Shared auth dependencies — passed to every router so middleware can verify tokens
 	authRepository := authRepo.NewAuthRepository(cfg)
-	staffRepo := staffRepo.NewStaffRepository(db, cfg)
-	staffUsecase := staffUsecase.NewStaffUsecase(db, authRepository, staffRepo, cfg)
-	authUsecase := authUsecase.NewAuthUsecase(authRepository, staffRepo, staffUsecase)
-	authHandler := authHandler.NewAuthHandler(authUsecase)
-	authRouter.SetupRoutes(api, authHandler)
+	staffRepository := staffRepo.NewStaffRepository(db, cfg)
 
-	// ===== ROLES MODULE =====
-	rolesRepo := rolesRepo.NewRolesRepository(db, cfg)
-	rolesUsecase := rolesUsecase.NewRolesUsecase(rolesRepo)
-	rolesHandler := rolesHandler.NewRolesHandler(rolesUsecase)
-	rolesRouter.SetupRoutes(api, rolesHandler)
+	// Auth
+	staffUC := staffUsecase.NewStaffUsecase(db, authRepository, staffRepository, cfg)
+	authUC := authUsecase.NewAuthUsecase(authRepository, staffRepository, staffUC)
+	authRouter.SetupRoutes(api, authHandler.NewAuthHandler(authUC), authRepository, staffRepository)
 
-	// ===== STAFF MODULE (TODO: Add after staff implementation) =====
-	staffHandler := staffHandler.NewStaffHandler(staffUsecase)
-	staffRouter.SetupRoutes(api, staffHandler)
+	// Roles
+	rolesRepository := rolesRepo.NewRolesRepository(db, cfg)
+	rolesUC := rolesUsecase.NewRolesUsecase(rolesRepository)
+	rolesRouter.SetupRoutes(api, rolesHandler.NewRolesHandler(rolesUC), authRepository, staffRepository)
 
-	// ===== OTHER MODULES =====
-	// Add more modules here as you build them:
-	// - inventory
-	// - sales
-	// - customers
-	// - products
-	// - invoices
-	// - payments
-	// - suppliers
-	// - purchase_orders
-	// - bills
-	// - materials
-	// - job_costing
-	// - payroll
-	// - attendance
-	// - tasks
-	// - notifications
-	// - reports
-	// - dashboard
-	// - audit
+	// Staff
+	staffRouter.SetupRoutes(api, staffHandler.NewStaffHandler(staffUC), authRepository, staffRepository)
 }
