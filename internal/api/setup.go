@@ -28,7 +28,7 @@ func SetupRoutes(app *fiber.App) {
 	api := app.Group("/api/v1")
 
 	// Shared auth dependencies — passed to every router so middleware can verify tokens
-	authRepository := authRepo.NewAuthRepository(cfg)
+	authRepository := authRepo.NewAuthRepository(cfg, db)
 	staffRepository := staffRepo.NewStaffRepository(db, cfg)
 
 	// Auth
