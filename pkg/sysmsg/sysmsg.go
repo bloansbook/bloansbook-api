@@ -35,6 +35,7 @@ const (
 	TokenInvalid       = "Invalid session token"
 	SetupComplete      = "Super Admin account created successfully"
 	SetupAlreadyDone   = "System setup has already been completed"
+	ProfileFetched     = "User profile fetched successfully"
 )
 
 // Staff
