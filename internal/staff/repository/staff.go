@@ -355,3 +355,21 @@ func (s *StaffRepository) GetStaffRoles(ctx context.Context, id uuid.UUID) ([]ro
 }
 
 // TODO: FIRE STAFF REPO
+
+// func (s *StaffRepository) FireStaff(ctx context.Context, id uuid.UUID, terminationReason string, recordedBy uuid.UUID) error {
+// 	tx, err := s.db.Begin(ctx)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to begin transaction: %w", err)
+// 	}
+// 	defer tx.Rollback(ctx)
+
+// 	stmt := `
+// 		INSERT INTO fired_staff (
+// 			staff_id,
+// 			termination_reason,
+// 			recorded_by,
+// 			recorded_at,
+// 		) VALUES (
+// 			$1, $2, $3, NOW()
+// 		)`
+// }
