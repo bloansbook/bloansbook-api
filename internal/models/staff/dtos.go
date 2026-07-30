@@ -166,3 +166,51 @@ type StaffRoleHistoryEntry struct {
 	Reason      *string   `json:"reason,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 }
+
+// StaffFilter holds all optional query parameters for the list staff endpoint.
+// Zero values mean "no filter applied" for that field.
+type StaffFilter struct {
+	Search     string // matches first_name, last_name, staff_id (ILIKE)
+	Status     string // one of: active, inactive, fired
+	Department string // one of: factory, admin, sales, management
+	SortBy     string // column to sort by: createdAt, firstName, lastName, staffId, department, status
+	SortOrder  string // asc or desc (default: desc)
+	Limit      int
+	Offset     int
+}
+
+// --- Termination DTOs ---
+
+// FireStaffPayload is the request body for terminating a staff member.
+type FireStaffPayload struct {
+	TerminationReason string `json:"terminationReason" validate:"required"`
+}
+
+// FireStaffResponse is returned after a successful staff termination.
+type FireStaffResponse struct {
+	ID                uuid.UUID `json:"id"`
+	StaffID           uuid.UUID `json:"staffId"`
+	TerminationReason string    `json:"terminationReason"`
+	RecordedBy        uuid.UUID `json:"recordedBy"`
+	RecordedAt        time.Time `json:"recordedAt"`
+	CreatedAt         time.Time `json:"createdAt"`
+}
+
+// OverrideTerminationPayload is the request body for overriding a termination record.
+// Only super_admin (staff.terminate permission) may call this endpoint.
+type OverrideTerminationPayload struct {
+	OverrideReason string `json:"overrideReason" validate:"required"`
+}
+
+// OverrideTerminationResponse is returned after a successful termination override.
+type OverrideTerminationResponse struct {
+	ID                uuid.UUID  `json:"id"`
+	StaffID           uuid.UUID  `json:"staffId"`
+	TerminationReason string     `json:"terminationReason"`
+	IsOverridden      bool       `json:"isOverridden"`
+	OverriddenBy      *uuid.UUID `json:"overriddenBy"`
+	OverriddenAt      *time.Time `json:"overriddenAt"`
+	OverrideReason    *string    `json:"overrideReason"`
+	RecordedAt        time.Time  `json:"recordedAt"`
+	CreatedAt         time.Time  `json:"createdAt"`
+}
