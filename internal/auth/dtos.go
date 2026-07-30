@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/bloansbook/bloansbook-api/internal/models/staff"
@@ -60,14 +62,32 @@ type Role struct {
 	Permissions []ModulePermission `json:"permissions"`
 }
 
-type ProfileDTO struct {
-	Staff Staff  `json:"me"`
-	Roles []Role `json:"roles"`
+// RoleList is a JSON-scannable slice used when reading the roles column
+// from a PostgreSQL json_agg result via pgx.
+type RoleList []Role
+
+func (r *RoleList) Scan(src any) error {
+	bytes, ok := src.([]byte)
+	if !ok {
+		return fmt.Errorf("expected []byte for roles, got %T", src)
+	}
+	return json.Unmarshal(bytes, r)
 }
 
-// TODO: Setup Login with staffID and Password with supabase auth
-// TODO: Return Response which includes the token - should save the role as part of the payload
-// TODO: Check the payload to see know role and role_permission
-// TODO: Authorise based on the role and permissions
+// PermissionList is a JSON-scannable slice used when reading the flat
+// permissions column from a PostgreSQL json_agg result via pgx.
+type PermissionList []string
 
-// TODO: Setup resend to send email to newly added users, their password and staffID so that they can login
+func (p *PermissionList) Scan(src any) error {
+	bytes, ok := src.([]byte)
+	if !ok {
+		return fmt.Errorf("expected []byte for permissions, got %T", src)
+	}
+	return json.Unmarshal(bytes, p)
+}
+
+type ProfileDTO struct {
+	Staff       Staff          `json:"me"`
+	Roles       RoleList       `json:"roles"`
+	Permissions PermissionList `json:"permissions"`
+}
