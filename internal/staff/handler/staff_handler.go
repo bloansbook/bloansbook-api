@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strings"
+
 	"github.com/bloansbook/bloansbook-api/internal/auth/middleware"
 	"github.com/bloansbook/bloansbook-api/internal/models"
 	"github.com/bloansbook/bloansbook-api/internal/models/staff"
@@ -65,15 +67,22 @@ func (h *StaffHandler) GetStaffById(c fiber.Ctx) error {
 }
 
 func (h *StaffHandler) GetAllStaff(c fiber.Ctx) error {
+	filter := staff.StaffFilter{
+		Search:     fiber.Query(c, "search", ""),
+		Status:     fiber.Query(c, "status", ""),
+		Department: fiber.Query(c, "department", ""),
+		SortBy:     fiber.Query(c, "sortBy", "createdAt"),
+		SortOrder:  fiber.Query(c, "sortOrder", "desc"),
+		Limit:      fiber.Query(c, "limit", 20),
+		Offset:     fiber.Query(c, "offset", 0),
+	}
+
 	totalCount, err := h.usecase.GetStaffCount(c.Context())
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
 	}
 
-	limit := fiber.Query(c, "limit", 10)
-	offset := fiber.Query(c, "offset", 0)
-
-	staffList, err := h.usecase.GetAllStaff(c.Context(), limit, offset)
+	staffList, err := h.usecase.GetAllStaff(c.Context(), filter)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
 	}
@@ -82,8 +91,8 @@ func (h *StaffHandler) GetAllStaff(c fiber.Ctx) error {
 		Data:       staffList,
 		Count:      len(staffList),
 		TotalCount: totalCount,
-		Limit:      limit,
-		Offset:     offset,
+		Limit:      filter.Limit,
+		Offset:     filter.Offset,
 	}
 
 	return response.Success(c, sysmsg.StaffListFetched, data, fiber.StatusOK)
@@ -113,8 +122,6 @@ func (h *StaffHandler) UpdateStaff(c fiber.Ctx) error {
 
 	return response.Success(c, sysmsg.StaffUpdated, staff, fiber.StatusOK)
 }
-
-// --- Staff Role Handlers ---
 
 func (h *StaffHandler) AssignRole(c fiber.Ctx) error {
 	staffID, err := uuid.Parse(c.Params("id"))
@@ -203,4 +210,60 @@ func (h *StaffHandler) GetRoleHistory(c fiber.Ctx) error {
 	}
 
 	return response.Success(c, sysmsg.RoleFetched, history, fiber.StatusOK)
+}
+
+func (h *StaffHandler) FireStaff(c fiber.Ctx) error {
+	staffID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	caller, ok := middleware.CallerStaffID(c)
+	if !ok {
+		return response.Error(c, sysmsg.Unauthorized, fiber.StatusUnauthorized)
+	}
+	callerID := caller.(uuid.UUID)
+
+	var payload staff.FireStaffPayload
+	if err := c.Bind().Body(&payload); err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	result, err := h.usecase.FireStaff(c.Context(), staffID, &payload, callerID)
+	if err != nil {
+		if strings.Contains(err.Error(), "already terminated") {
+			return response.Error(c, sysmsg.StaffAlreadyFired, fiber.StatusConflict)
+		}
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return response.Success(c, sysmsg.StaffTerminated, result, fiber.StatusOK)
+}
+
+func (h *StaffHandler) OverrideTermination(c fiber.Ctx) error {
+	staffID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	caller, ok := middleware.CallerStaffID(c)
+	if !ok {
+		return response.Error(c, sysmsg.Unauthorized, fiber.StatusUnauthorized)
+	}
+	callerID := caller.(uuid.UUID)
+
+	var payload staff.OverrideTerminationPayload
+	if err := c.Bind().Body(&payload); err != nil {
+		return response.Error(c, sysmsg.BadRequest, fiber.StatusBadRequest)
+	}
+
+	result, err := h.usecase.OverrideTermination(c.Context(), staffID, &payload, callerID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no active termination record") {
+			return response.Error(c, sysmsg.StaffNotFound, fiber.StatusNotFound)
+		}
+		return response.Error(c, err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return response.Success(c, sysmsg.StaffTerminationOverride, result, fiber.StatusOK)
 }
