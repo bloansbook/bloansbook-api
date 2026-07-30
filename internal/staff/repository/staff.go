@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/bloansbook/bloansbook-api/internal/models/roles"
 	"github.com/bloansbook/bloansbook-api/internal/models/staff"
@@ -189,10 +190,57 @@ func (s *StaffRepository) GetStaffByStaffID(ctx context.Context, staffID string)
 	return &m, nil
 }
 
-func (s *StaffRepository) GetAllStaff(ctx context.Context, limit, offset int) ([]staff.Staff, error) {
-	stmt := staffSelectQuery + `ORDER BY s.created_at DESC LIMIT $1 OFFSET $2`
+// GetAllStaff returns a filtered, sorted, paginated list of staff members.
+// All filter fields on StaffFilter are optional — zero values are ignored.
+func (s *StaffRepository) GetAllStaff(ctx context.Context, f staff.StaffFilter) ([]staff.Staff, error) {
+	sortColumn := map[string]string{
+		"createdAt":  "s.created_at",
+		"firstName":  "s.first_name",
+		"lastName":   "s.last_name",
+		"staffId":    "s.staff_id",
+		"department": "s.department",
+		"status":     "s.status",
+	}
+	col, ok := sortColumn[f.SortBy]
+	if !ok {
+		col = "s.created_at"
+	}
 
-	rows, err := s.db.Query(ctx, stmt, limit, offset)
+	order := "DESC"
+	if strings.EqualFold(f.SortOrder, "asc") {
+		order = "ASC"
+	}
+
+	args := pgx.NamedArgs{}
+	where := ""
+
+	if f.Search != "" {
+		where += `
+			AND (
+				s.first_name ILIKE '%' || @search || '%'
+				OR s.last_name  ILIKE '%' || @search || '%'
+				OR s.staff_id   ILIKE '%' || @search || '%'
+			)`
+		args["search"] = f.Search
+	}
+	if f.Status != "" {
+		where += ` AND s.status = @status`
+		args["status"] = f.Status
+	}
+	if f.Department != "" {
+		where += ` AND s.department = @department`
+		args["department"] = f.Department
+	}
+
+	args["limit"] = f.Limit
+	args["offset"] = f.Offset
+
+	stmt := staffSelectQuery +
+		`WHERE 1=1` + where +
+		` ORDER BY ` + col + ` ` + order +
+		` LIMIT @limit OFFSET @offset`
+
+	rows, err := s.db.Query(ctx, stmt, args)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all staff: %w", err)
 	}
@@ -354,22 +402,140 @@ func (s *StaffRepository) GetStaffRoles(ctx context.Context, id uuid.UUID) ([]ro
 	return list, nil
 }
 
-// TODO: FIRE STAFF REPO
+// FireStaff terminates a staff member in a single transaction.
+func (s *StaffRepository) FireStaff(ctx context.Context, staffID uuid.UUID, terminationReason string, recordedBy uuid.UUID) (*staff.FireStaffResponse, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
-// func (s *StaffRepository) FireStaff(ctx context.Context, id uuid.UUID, terminationReason string, recordedBy uuid.UUID) error {
-// 	tx, err := s.db.Begin(ctx)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to begin transaction: %w", err)
-// 	}
-// 	defer tx.Rollback(ctx)
+	var existingID uuid.UUID
+	if err := tx.QueryRow(ctx,
+		`SELECT id FROM staff WHERE id = $1 AND status != 'fired'`,
+		staffID,
+	).Scan(&existingID); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("staff not found or already terminated")
+		}
+		return nil, fmt.Errorf("failed to verify staff status: %w", err)
+	}
 
-// 	stmt := `
-// 		INSERT INTO fired_staff (
-// 			staff_id,
-// 			termination_reason,
-// 			recorded_by,
-// 			recorded_at,
-// 		) VALUES (
-// 			$1, $2, $3, NOW()
-// 		)`
-// }
+	var result staff.FireStaffResponse
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO fired_staff (staff_id, termination_reason, recorded_by, recorded_at)
+		VALUES ($1, $2, $3, NOW())
+		RETURNING id, staff_id, termination_reason, recorded_by, recorded_at, created_at
+	`, staffID, terminationReason, recordedBy).Scan(
+		&result.ID,
+		&result.StaffID,
+		&result.TerminationReason,
+		&result.RecordedBy,
+		&result.RecordedAt,
+		&result.CreatedAt,
+	); err != nil {
+		return nil, fmt.Errorf("failed to record termination: %w", err)
+	}
+
+	rows, err := tx.Query(ctx,
+		`DELETE FROM staff_roles WHERE staff_id = $1 RETURNING role_id`,
+		staffID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove staff roles: %w", err)
+	}
+	defer rows.Close()
+
+	var revokedRoles []uuid.UUID
+	for rows.Next() {
+		var roleID uuid.UUID
+		if err := rows.Scan(&roleID); err != nil {
+			return nil, fmt.Errorf("failed to scan revoked role: %w", err)
+		}
+		revokedRoles = append(revokedRoles, roleID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating revoked roles: %w", err)
+	}
+
+	reason := "Termination from job: " + terminationReason
+	for _, roleID := range revokedRoles {
+		if err := insertRoleHistory(ctx, tx, staffID, roleID, recordedBy, "revoked", &reason); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE staff
+		SET status = 'fired', fired_at = $1, updated_at = NOW()
+		WHERE id = $2
+	`, result.RecordedAt, staffID); err != nil {
+		return nil, fmt.Errorf("failed to update staff status: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit termination: %w", err)
+	}
+
+	return &result, nil
+}
+
+// OverrideTermination marks a fired_staff record as overridden and restores the staff member to active.
+func (s *StaffRepository) OverrideTermination(ctx context.Context, staffID uuid.UUID, overrideReason string, overriddenBy uuid.UUID) (*staff.OverrideTerminationResponse, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var firedStaffID uuid.UUID
+	if err := tx.QueryRow(ctx,
+		`SELECT id FROM fired_staff WHERE staff_id = $1 AND is_overridden = false`,
+		staffID,
+	).Scan(&firedStaffID); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("no active termination record found for this staff member")
+		}
+		return nil, fmt.Errorf("failed to verify termination record: %w", err)
+	}
+
+	var result staff.OverrideTerminationResponse
+	if err := tx.QueryRow(ctx, `
+		UPDATE fired_staff
+		SET
+			is_overridden   = true,
+			overridden_by   = $1,
+			overridden_at   = NOW(),
+			override_reason = $2
+		WHERE id = $3
+		RETURNING id, staff_id, termination_reason, is_overridden,
+		          overridden_by, overridden_at, override_reason,
+		          recorded_at, created_at
+	`, overriddenBy, overrideReason, firedStaffID).Scan(
+		&result.ID,
+		&result.StaffID,
+		&result.TerminationReason,
+		&result.IsOverridden,
+		&result.OverriddenBy,
+		&result.OverriddenAt,
+		&result.OverrideReason,
+		&result.RecordedAt,
+		&result.CreatedAt,
+	); err != nil {
+		return nil, fmt.Errorf("failed to override termination: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE staff
+		SET status = 'active', fired_at = NULL, updated_at = NOW()
+		WHERE id = $1
+	`, staffID); err != nil {
+		return nil, fmt.Errorf("failed to restore staff status: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit override: %w", err)
+	}
+
+	return &result, nil
+}
