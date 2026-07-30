@@ -39,7 +39,7 @@ func (u *AuthUsecase) Login(ctx context.Context, payload auth.LoginDTO) (*Tokens
 	}
 
 	if !staff.HasLogin {
-		return nil, fmt.Errorf("Staff has no login access: %w", err)
+		return nil, fmt.Errorf("staff does not have login access")
 	}
 
 	tokenResp, err := u.authRepo.SignInWithPassword(ctx, payload)
