@@ -40,15 +40,16 @@ const (
 
 // Staff
 const (
-	StaffCreated      = "Staff record created successfully"
-	StaffFetched      = "Staff record fetched successfully"
-	StaffListFetched  = "Staff records fetched successfully"
-	StaffUpdated      = "Staff record updated successfully"
-	StaffDeactivated  = "Staff member deactivated successfully"
-	StaffNotFound     = "Staff record not found"
-	StaffIDExists     = "A staff record with this ID already exists"
-	StaffTerminated   = "Staff member has been terminated"
-	StaffAlreadyFired = "This staff member has already been terminated"
+	StaffCreated             = "Staff record created successfully"
+	StaffFetched             = "Staff record fetched successfully"
+	StaffListFetched         = "Staff records fetched successfully"
+	StaffUpdated             = "Staff record updated successfully"
+	StaffDeactivated         = "Staff member deactivated successfully"
+	StaffNotFound            = "Staff record not found"
+	StaffIDExists            = "A staff record with this ID already exists"
+	StaffTerminated          = "Staff member has been terminated"
+	StaffAlreadyFired        = "This staff member has already been terminated"
+	StaffTerminationOverride = "Termination record has been overridden and staff member restored"
 )
 
 // Roles & Permissions
