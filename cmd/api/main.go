@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gofiber/fiber/v3"
@@ -17,10 +18,8 @@ import (
 )
 
 func main() {
-	// Load config
 	config.Load()
 
-	// Connect to DB
 	database.Connect()
 	defer database.Close()
 
@@ -28,19 +27,29 @@ func main() {
 		AppName: "BloansBook API v1",
 	})
 
-	// Use a config-driven CORS setup for production readiness
-	allowedOrigins := config.ApplicationConfig.App.AllowedOrigins
-	if allowedOrigins == "" {
-		allowedOrigins = "*" // Fallback to * for local dev if not specified
+	rawOrigins := config.ApplicationConfig.App.AllowedOrigins
+
+	var allowedOrigins []string
+	allowCredentials := false
+
+	if rawOrigins == "" || rawOrigins == "*" {
+		allowedOrigins = []string{"*"}
+	} else {
+		for _, o := range strings.Split(rawOrigins, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				allowedOrigins = append(allowedOrigins, trimmed)
+			}
+		}
+		allowCredentials = true
 	}
 
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{allowedOrigins},
+		AllowOrigins:     allowedOrigins,
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowCredentials: false,
+		AllowCredentials: allowCredentials,
 	}))
 
 	app.Get("/health", func(c fiber.Ctx) error {
