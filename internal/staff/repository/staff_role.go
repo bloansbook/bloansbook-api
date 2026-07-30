@@ -10,7 +10,6 @@ import (
 )
 
 // AssignRole adds a role to a staff member and writes an 'assigned' history entry.
-// Both writes happen in a single transaction.
 func (s *StaffRepository) AssignRole(ctx context.Context, staffID, roleID, performedBy uuid.UUID, reason *string) (*staff.StaffRoleResponse, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -18,9 +17,6 @@ func (s *StaffRepository) AssignRole(ctx context.Context, staffID, roleID, perfo
 	}
 	defer tx.Rollback(ctx)
 
-	// Insert into staff_roles and resolve role name in one round-trip.
-	// ON CONFLICT DO NOTHING returns no row if the role was already assigned,
-	// which causes pgx.ErrNoRows — we surface that as a clear error.
 	var roleName string
 	err = tx.QueryRow(ctx, `
 		WITH ins AS (
@@ -62,7 +58,6 @@ func (s *StaffRepository) RevokeRole(ctx context.Context, staffID, roleID, perfo
 	}
 	defer tx.Rollback(ctx)
 
-	// Fetch role name and confirm assignment exists before deleting
 	var roleName string
 	if err := tx.QueryRow(ctx, `
 		SELECT r.name
@@ -100,7 +95,6 @@ func (s *StaffRepository) RevokeRole(ctx context.Context, staffID, roleID, perfo
 }
 
 // UpdateRole atomically revokes the old role and assigns the new one.
-// Writes two history entries in the same transaction.
 func (s *StaffRepository) UpdateRole(ctx context.Context, staffID, performedBy uuid.UUID, payload *staff.UpdateRolePayload) (*staff.StaffRoleResponse, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -108,7 +102,6 @@ func (s *StaffRepository) UpdateRole(ctx context.Context, staffID, performedBy u
 	}
 	defer tx.Rollback(ctx)
 
-	// Verify old role is actually assigned
 	var oldRoleName string
 	if err := tx.QueryRow(ctx, `
 		SELECT r.name
@@ -122,7 +115,6 @@ func (s *StaffRepository) UpdateRole(ctx context.Context, staffID, performedBy u
 		return nil, fmt.Errorf("failed to verify old role: %w", err)
 	}
 
-	// Revoke old role
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM staff_roles WHERE staff_id = $1 AND role_id = $2`,
 		staffID, payload.OldRoleID,
@@ -133,7 +125,6 @@ func (s *StaffRepository) UpdateRole(ctx context.Context, staffID, performedBy u
 		return nil, err
 	}
 
-	// Assign new role and resolve its name
 	var newRoleName string
 	if err := tx.QueryRow(ctx, `
 		WITH ins AS (
