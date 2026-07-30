@@ -15,8 +15,9 @@ func SetupRoutes(api fiber.Router, h *handler.StaffHandler, ar *authRepo.AuthRep
 	staff.Post("/", middleware.RequirePermission("staff.create"), h.CreateStaff)
 	staff.Get("/:id", middleware.RequirePermission("staff.view"), h.GetStaffById)
 	staff.Patch("/:id", middleware.RequirePermission("staff.update"), h.UpdateStaff)
+	staff.Post("/:id/fire", middleware.RequirePermission("staff.terminate"), h.FireStaff)
+	staff.Patch("/:id/fire/override", middleware.RequirePermission("staff.terminate"), h.OverrideTermination)
 
-	// Role management — all require auth.manage_roles
 	staff.Post("/:id/roles", middleware.RequirePermission("auth.manage_roles"), h.AssignRole)
 	staff.Delete("/:id/roles", middleware.RequirePermission("auth.manage_roles"), h.RevokeRole)
 	staff.Put("/:id/roles", middleware.RequirePermission("auth.manage_roles"), h.UpdateRole)
