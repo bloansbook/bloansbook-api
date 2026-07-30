@@ -120,15 +120,15 @@ func (u *StaffUsecase) GetStaffByID(ctx context.Context, id uuid.UUID) (*staff.S
 	return &dto, nil
 }
 
-func (u *StaffUsecase) GetAllStaff(ctx context.Context, limit, offset int) ([]staff.StaffDTO, error) {
-	if limit <= 0 {
-		limit = 20
+func (u *StaffUsecase) GetAllStaff(ctx context.Context, filter staff.StaffFilter) ([]staff.StaffDTO, error) {
+	if filter.Limit <= 0 {
+		filter.Limit = 20
 	}
-	if offset < 0 {
-		offset = 0
+	if filter.Offset < 0 {
+		filter.Offset = 0
 	}
 
-	members, err := u.repository.GetAllStaff(ctx, limit, offset)
+	members, err := u.repository.GetAllStaff(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get staff: %w", err)
 	}
@@ -205,8 +205,6 @@ func (u *StaffUsecase) getOrCreateSystemStaff(ctx context.Context) (*staff.Creat
 	}, nil
 }
 
-// --- Staff Role Methods ---
-
 func (u *StaffUsecase) AssignRole(ctx context.Context, staffID, roleID, performedBy uuid.UUID, reason *string) (*staff.StaffRoleResponse, error) {
 	if _, err := u.repository.GetStaffByID(ctx, staffID); err != nil {
 		return nil, fmt.Errorf("staff not found: %w", err)
@@ -233,4 +231,18 @@ func (u *StaffUsecase) GetRoleHistory(ctx context.Context, staffID uuid.UUID) ([
 		return nil, fmt.Errorf("staff not found: %w", err)
 	}
 	return u.repository.GetRoleHistory(ctx, staffID)
+}
+
+func (u *StaffUsecase) FireStaff(ctx context.Context, staffID uuid.UUID, payload *staff.FireStaffPayload, recordedBy uuid.UUID) (*staff.FireStaffResponse, error) {
+	if _, err := u.repository.GetStaffByID(ctx, staffID); err != nil {
+		return nil, fmt.Errorf("staff not found: %w", err)
+	}
+	return u.repository.FireStaff(ctx, staffID, payload.TerminationReason, recordedBy)
+}
+
+func (u *StaffUsecase) OverrideTermination(ctx context.Context, staffID uuid.UUID, payload *staff.OverrideTerminationPayload, overriddenBy uuid.UUID) (*staff.OverrideTerminationResponse, error) {
+	if _, err := u.repository.GetStaffByID(ctx, staffID); err != nil {
+		return nil, fmt.Errorf("staff not found: %w", err)
+	}
+	return u.repository.OverrideTermination(ctx, staffID, payload.OverrideReason, overriddenBy)
 }
