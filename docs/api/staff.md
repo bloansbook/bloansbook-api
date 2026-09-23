@@ -6,6 +6,15 @@ The staff module manages all personnel records — from creation through role ma
 
 All endpoints require authentication. Permission requirements are noted per endpoint.
 
+### A note on validation
+
+Required string fields are trimmed of surrounding whitespace before use, and empty or whitespace-only values are rejected:
+
+- **On create**, a missing or blank required field (`firstName`, `lastName`, `department`, `jobTitle`, `payType`) is rejected with the message `<field> is required`.
+- **On update**, a field that is present but blank is rejected with `<field> cannot be empty`.
+
+_These validation failures currently return `500`. Mapping them to `400` is a planned cross-module change._
+
 ---
 
 ## Data Models
@@ -287,9 +296,10 @@ POST /api/v1/staff
 
 | Status | Message | Cause |
 |---|---|---|
-| `400` | `Invalid request data` | Missing or malformed fields |
+| `400` | `Invalid request data` | Malformed JSON body |
 | `401` | `Authentication required` | No valid token |
 | `403` | `You do not have permission to perform this action` | Missing `staff.create` |
+| `500` | `firstName is required` (or `lastName`, `department`, `jobTitle`, `payType`) | A required field was empty or whitespace-only |
 | `500` | `failed to create staff: ...` | Database error or `staffId` conflict |
 | `500` | `failed to send welcome email: ...` | Email delivery failed (record was saved) |
 
@@ -330,6 +340,17 @@ All body fields are optional. Include only what you want to change.
   }
 }
 ```
+
+**Error Responses**
+
+| Status | Message | Cause |
+|---|---|---|
+| `400` | `Invalid request data` | `:id` is not a valid UUID, or body is malformed |
+| `401` | `Authentication required` | No valid token |
+| `403` | `You do not have permission to perform this action` | Missing `staff.update` |
+| `500` | `firstName cannot be empty` (or `lastName`, `department`, `jobTitle`, `payType`) | A provided field was whitespace-only |
+| `500` | `cannot update non-existent staff: ...` | No record found for the given ID |
+| `500` | `failed to update staff: ...` | Database error |
 
 ---
 

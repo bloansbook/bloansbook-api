@@ -42,6 +42,28 @@ func (u *StaffUsecase) GetStaffCount(ctx context.Context) (int, error) {
 }
 
 func (u *StaffUsecase) CreateStaff(ctx context.Context, createdBy uuid.UUID, payload *staff.CreateStaffPayload) (*staff.CreateStaffResponse, error) {
+	payload.FirstName = strings.TrimSpace(payload.FirstName)
+	payload.LastName = strings.TrimSpace(payload.LastName)
+	payload.Department = strings.TrimSpace(payload.Department)
+	payload.JobTitle = strings.TrimSpace(payload.JobTitle)
+	payload.PayType = strings.TrimSpace(payload.PayType)
+
+	if payload.FirstName == "" {
+		return nil, fmt.Errorf("firstName is required")
+	}
+	if payload.LastName == "" {
+		return nil, fmt.Errorf("lastName is required")
+	}
+	if payload.Department == "" {
+		return nil, fmt.Errorf("department is required")
+	}
+	if payload.JobTitle == "" {
+		return nil, fmt.Errorf("jobTitle is required")
+	}
+	if payload.PayType == "" {
+		return nil, fmt.Errorf("payType is required")
+	}
+
 	count, err := u.repository.CountStaff(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count staff: %w", err)
@@ -141,6 +163,42 @@ func (u *StaffUsecase) GetAllStaff(ctx context.Context, filter staff.StaffFilter
 }
 
 func (u *StaffUsecase) UpdateStaff(ctx context.Context, id uuid.UUID, payload *staff.UpdateStaffPayload) (*staff.UpdateStaffResponse, error) {
+	if payload.FirstName != nil {
+		trimmed := strings.TrimSpace(*payload.FirstName)
+		if trimmed == "" {
+			return nil, fmt.Errorf("firstName cannot be empty")
+		}
+		payload.FirstName = &trimmed
+	}
+	if payload.LastName != nil {
+		trimmed := strings.TrimSpace(*payload.LastName)
+		if trimmed == "" {
+			return nil, fmt.Errorf("lastName cannot be empty")
+		}
+		payload.LastName = &trimmed
+	}
+	if payload.Department != nil {
+		trimmed := strings.TrimSpace(*payload.Department)
+		if trimmed == "" {
+			return nil, fmt.Errorf("department cannot be empty")
+		}
+		payload.Department = &trimmed
+	}
+	if payload.JobTitle != nil {
+		trimmed := strings.TrimSpace(*payload.JobTitle)
+		if trimmed == "" {
+			return nil, fmt.Errorf("jobTitle cannot be empty")
+		}
+		payload.JobTitle = &trimmed
+	}
+	if payload.PayType != nil {
+		trimmed := strings.TrimSpace(*payload.PayType)
+		if trimmed == "" {
+			return nil, fmt.Errorf("payType cannot be empty")
+		}
+		payload.PayType = &trimmed
+	}
+
 	if _, err := u.repository.GetStaffByID(ctx, id); err != nil {
 		return nil, fmt.Errorf("cannot update non-existent staff: %w", err)
 	}
